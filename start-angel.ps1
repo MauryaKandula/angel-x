@@ -1,4 +1,4 @@
-# Launch Angel X Cyberpunk Desktop Assistant cleanly in interactive session
+# Launch Angel X Desktop Assistant cleanly in interactive session
 $appDir = $PSScriptRoot
 $exe = Join-Path $appDir "node_modules\electron\dist\Angel.exe"
 if (Test-Path $exe) {

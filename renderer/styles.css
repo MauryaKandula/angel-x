@@ -1,11 +1,11 @@
-/* cue — cyberpunk HUD & glassmorphism overlay. Inspired by Cyberpunk 2077 & Xenova HUD. */
+/* Angel X — Minimalist HUD & glassmorphism desktop overlay */
 
 :root {
   --main-w: 700px;                       /* matches MAIN_W in main.js */
   --side-w: 300px;                       /* matches SIDE_W in main.js */
   --cue-bg-opacity: 0.85;                /* Adjustable 0 to 1 (0% to 100%) */
 
-  /* Cyberpunk 2077 / Xenova HUD Theme Tokens */
+  /* Obsidian HUD Theme Tokens */
   --cyber-cyan: #00f0ff;
   --cyber-yellow: #fcee0a;
   --cyber-magenta: #ff0055;
@@ -52,7 +52,7 @@ html, body {
   user-select: none;
 }
 
-/* Cyberpunk Slim Scrollbar */
+/* Slim HUD Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -723,7 +723,7 @@ button:focus { outline: none; }
 .s-field input:focus { border-color: #00f0ff; box-shadow: 0 0 12px rgba(0, 240, 255, 0.55); }
 .s-help { color: var(--tx-mut); font-size: 11px; line-height: 1.4; margin: 4px 0 2px 88px; }
 
-/* Cyberpunk API Banner & Model Presets */
+/* API Key Banner & Model Presets */
 .cyber-api-callout {
   margin: 8px 0 12px;
   padding: 10px 14px;

@@ -1729,7 +1729,7 @@ function updateTray() {
   const currentBgOpacity = Math.round((settings.backgroundOpacity != null ? settings.backgroundOpacity : 0.85) * 100);
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Angel X — Cyberpunk Desktop AI HUD', enabled: false },
+    { label: 'Angel X — Desktop AI HUD', enabled: false },
     { type: 'separator' },
     {
       label: isVisible ? 'Hide Angel X' : 'Show Angel X',
@@ -1866,7 +1866,7 @@ function createTray() {
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
-    tray.setToolTip('Angel X Assistant — Transparent Cyberpunk Desktop AI');
+    tray.setToolTip('Angel X — Transparent Desktop AI HUD');
     tray.on('click', () => toggleWindowVisibility());
     updateTray();
   } catch (err) {

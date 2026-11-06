@@ -2,7 +2,7 @@
   "name": "angel-x",
   "productName": "Angel X",
   "version": "1.0.0",
-  "description": "Angel X — High-Performance Cyberpunk Transparent Desktop AI Overlay for Windows with Universal GPT & Local Whisper STT",
+  "description": "Angel X — Minimalist, high-performance transparent desktop AI HUD for Windows with visual reasoning, live audio transcription, and universal model support",
   "license": "GPL-3.0-or-later",
   "author": "Kandula Paul Saketh Maurya <mauryakpsofficial@gmail.com>",
   "homepage": "https://github.com/MauryaKandula/angel-x",

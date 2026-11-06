@@ -29,7 +29,7 @@ test('clampOpacity retains minimum 0.2 for backwards compatibility', () => {
   assert.strictEqual(clampOpacity(1.0), 1.0);
 });
 
-test('HTML structure includes Angel AI overlay controls and Cyberpunk GPT toolbar', () => {
+test('HTML structure includes Angel X overlay controls and GPT toolbar', () => {
   const html = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8');
   assert.ok(html.includes('id="compact-btn"'), 'compact button in toolbar');
   assert.ok(html.includes('id="clickthrough-btn"'), 'click-through button in toolbar');
@@ -38,7 +38,7 @@ test('HTML structure includes Angel AI overlay controls and Cyberpunk GPT toolba
   assert.ok(html.includes('id="resize-handle"'), 'custom resize handle');
   assert.ok(html.includes('id="tb-gpt-btn"'), 'quick GPT key and model button in toolbar');
   assert.ok(html.includes('id="tb-gpt-badge"'), 'GPT active badge in toolbar');
-  assert.ok(html.includes('class="cyber-api-callout"'), 'cyberpunk GPT API callout');
+  assert.ok(html.includes('class="cyber-api-callout"'), 'HUD GPT API callout');
   assert.ok(html.includes('class="model-presets"'), 'quick model preset chips');
   assert.ok(html.includes('data-tab="shortcuts"'), 'shortcuts settings tab');
   assert.ok(html.includes('data-pane="shortcuts"'), 'shortcuts settings panel');
@@ -46,17 +46,17 @@ test('HTML structure includes Angel AI overlay controls and Cyberpunk GPT toolba
   assert.ok(html.includes('id="s-compact-mode"'), 'compact mode setting checkbox');
 });
 
-test('CSS styles support high-contrast transparent background and Cyberpunk HUD theme', () => {
+test('CSS styles support high-contrast transparent background and HUD theme', () => {
   const css = fs.readFileSync(path.join(__dirname, '../renderer/styles.css'), 'utf8');
   assert.ok(css.includes('--cue-bg-opacity'), 'variable for dynamic transparency');
   assert.ok(css.includes('text-shadow'), 'readable high-contrast text shadow for transparent overlays');
   assert.ok(css.includes('.compact-mode'), 'compact mode layout rules');
   assert.ok(css.includes('.clickthrough-banner'), 'click-through mode indicator style');
   assert.ok(css.includes('.resize-handle'), 'resize handle styling');
-  assert.ok(css.includes('--cyber-cyan'), 'cyberpunk cyan neon token');
-  assert.ok(css.includes('--cyber-yellow'), 'cyberpunk yellow accent token');
+  assert.ok(css.includes('--cyber-cyan'), 'cyan accent token');
+  assert.ok(css.includes('--cyber-yellow'), 'yellow accent token');
   assert.ok(css.includes('.tb-gpt-chip'), 'quick GPT access chip style');
-  assert.ok(css.includes('.cyber-api-callout'), 'cyberpunk GPT API banner style');
+  assert.ok(css.includes('.cyber-api-callout'), 'GPT API banner style');
 });
 
 test('preload bridge exposes Angel AI and GPT capabilities', () => {
