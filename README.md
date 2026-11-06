@@ -1,24 +1,24 @@
 <div align="center">
 
 ```
-   █████╗ ███╗   ██╗ ██████╗ ███████╗██╗     
-  ██╔══██╗████╗  ██║██╔════╝ ██╔════╝██║     
-  ███████║██╔██╗ ██║██║  ███╗█████╗  ██║     
-  ██╔══██║██║╚██╗██║██║   ██║██╔══╝  ██║     
-  ██║  ██║██║ ╚████║╚██████╔╝███████╗███████╗
-  ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝╚══════╝
+   █████╗ ███╗   ██╗ ██████╗ ███████╗██╗     ██╗  ██╗
+  ██╔══██╗████╗  ██║██╔════╝ ██╔════╝██║     ╚██╗██╔╝
+  ███████║██╔██╗ ██║██║  ███╗█████╗  ██║      ╚███╔╝ 
+  ██╔══██║██║╚██╗██║██║   ██║██╔══╝  ██║      ██╔██╗ 
+  ██║  ██║██║ ╚████║╚██████╔╝███████╗███████╗██╔╝ ██╗
+  ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
        C Y B E R P U N K   D E S K T O P   A I   O V E R L A Y
 ```
 
 ### Next-Generation Transparent HUD Assistant for Windows
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-00f0ff.svg?style=for-the-badge&logo=gnu)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-fcee0a.svg?style=for-the-badge&logo=windows)](https://github.com/MauryaKandula/angel-ai)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-fcee0a.svg?style=for-the-badge&logo=windows)](https://github.com/MauryaKandula/angel-x)
 [![Author](https://img.shields.io/badge/Author-Maurya%20Kandula-ff0055.svg?style=for-the-badge&logo=github)](https://github.com/MauryaKandula)
 [![Tests](https://img.shields.io/badge/Tests-562%20Passing-00ff9f.svg?style=for-the-badge&logo=node.js)](test/)
 [![Stealth](https://img.shields.io/badge/Stealth-WDA__EXCLUDEFROMCAPTURE-9d4edd.svg?style=for-the-badge)](README.md#screen-share-invisibility)
 
-**Angel AI** is a lightweight, high-performance Cyberpunk desktop AI overlay for Windows. Designed to float unobtrusively on top of your workspace, Angel gives you real-time visual reasoning, screen problem-solving, live meeting transcription, and conversational co-piloting — while remaining completely invisible to screen recording and screen sharing tools.
+**Angel X** is a high-performance Cyberpunk desktop AI overlay for Windows. Designed to float unobtrusively on top of your workspace, Angel X gives you real-time visual reasoning, screen problem-solving, live meeting transcription, and conversational co-piloting — while remaining completely invisible to screen recording and screen sharing tools.
 
 [Key Features](#key-features) • [Installation](#installation) • [Shortcuts](#global-shortcuts) • [API Setup](#byok-ai-model-matrix) • [Architecture](#architecture) • [License](#license)
 
@@ -34,11 +34,11 @@
 - **0% to 100% Background Opacity Slider:** Dial in your exact transparency from 0% pure floating wireframe text to 100% solid obsidian HUD directly from the toolbar slider or settings.
 
 ### 2. 🛡️ Native Screen Share Invisibility
-- **`WDA_EXCLUDEFROMCAPTURE` Hardware Protection:** Excludes the Angel window from Windows Desktop Duplication, BitBlt, PrintWindow, and DirectX capture pipelines.
+- **`WDA_EXCLUDEFROMCAPTURE` Hardware Protection:** Excludes the Angel X window from Windows Desktop Duplication, BitBlt, PrintWindow, and DirectX capture pipelines.
 - **Stealth During Meetings:** Invisible on Discord, Zoom, Microsoft Teams, Google Meet, OBS Studio, and Windows Snipping Tool. Your AI stays private to your physical display.
 
 ### 3. 🖱️ Click-Through Mode
-- **Zero-Interference Overlay:** Hit `Ctrl+Shift+I` to make Angel transparent to all mouse clicks. Work, code, and game directly beneath the overlay while keeping AI guidance in your line of sight.
+- **Zero-Interference Overlay:** Hit `Ctrl+Shift+I` to make Angel X transparent to all mouse clicks. Work, code, and game directly beneath the overlay while keeping AI guidance in your line of sight.
 - **Fail-Safe Recovery:** Dedicated indicator banner with emergency restore shortcut (`Ctrl+Shift+F12`) and tray restoration.
 
 ### 4. 🧠 Universal GPT & LLM Matrix (BYOK)
@@ -64,8 +64,8 @@
 Clone the repository and run the standalone Windows launcher:
 
 ```powershell
-git clone https://github.com/MauryaKandula/angel-ai.git
-cd angel-ai
+git clone https://github.com/MauryaKandula/angel-x.git
+cd angel-x
 npm install
 .\start-angel.bat
 ```
@@ -77,7 +77,7 @@ npm install
 To build a native Windows NSIS installer or unpacked portable executable:
 
 ```bash
-# Build unpacked Windows portable directory (dist/win-unpacked/Angel.exe)
+# Build unpacked Windows portable directory (dist/win-unpacked/Angel X.exe)
 npm run pack:win
 
 # Build official Windows NSIS Installer (.exe)
@@ -90,7 +90,7 @@ The resulting installer will be located in the `dist/` directory.
 
 ## ⌨️ Global Shortcuts
 
-Angel AI responds to system-wide global shortcuts, allowing instantaneous interaction from any application:
+Angel X responds to system-wide global shortcuts, allowing instantaneous interaction from any application:
 
 | Shortcut | Action | Description |
 |---|---|---|
@@ -100,15 +100,15 @@ Angel AI responds to system-wide global shortcuts, allowing instantaneous intera
 | `Ctrl + Shift + M` | **Compact Mode** | Toggles the HUD between ultra-minimal bar and expanded view |
 | `Ctrl + Shift + I` | **Click-Through** | Enables mouse click-through mode |
 | `Ctrl + Shift + F12` | **Emergency Escape** | Immediately restores mouse interaction from click-through mode |
-| `Ctrl + Shift + X` | **Quit Angel** | Instantly closes the Angel AI overlay |
+| `Ctrl + Shift + X` | **Quit Angel X** | Instantly closes the Angel X overlay |
 
 ---
 
 ## ⚙️ BYOK AI Model Matrix Setup
 
-Angel AI supports both direct API keys and self-hosted local endpoints.
+Angel X supports both direct API keys and self-hosted local endpoints.
 
-1. Launch Angel AI.
+1. Launch Angel X.
 2. Click the `⚡ GPT [API]` chip on the floating toolbar (or click the Settings gear icon `⚙️`).
 3. Under the **Keys / Provider** tab, select your preferred engine:
    - **OpenAI:** Enter your `sk-...` API key. Default: `gpt-4o-mini` (fast) / `gpt-4o` (smart).
@@ -123,7 +123,7 @@ Angel AI supports both direct API keys and self-hosted local endpoints.
 
 ```
                     ┌──────────────────────────────────┐
-                    │      Angel AI Cyberpunk HUD      │
+                    │      Angel X Cyberpunk HUD       │
                     │   (Electron Frameless Window)    │
                     └─────────────────┬────────────────┘
                                       │ IPC Bridge
@@ -168,7 +168,7 @@ Expected output:
 
 ## 📜 Legal & License
 
-**Angel AI** is released under the **GNU General Public License v3.0 (GPL-3.0-or-later)**.
+**Angel X** is released under the **GNU General Public License v3.0 (GPL-3.0-or-later)**.
 
 - **Primary Author & Maintainer:** **Kandula Paul Saketh Maurya (MK)** ([@MauryaKandula](https://github.com/MauryaKandula))
 - **Copyright:** Copyright (C) 2026 Kandula Paul Saketh Maurya.

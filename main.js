@@ -325,7 +325,7 @@ function createWindow() {
     skipTaskbar: false,
     alwaysOnTop: true,
     fullscreenable: false,
-    title: 'Angel',
+    title: 'Angel X',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -359,13 +359,13 @@ function createWindow() {
     moveSaveTimer = setTimeout(saveWindowPosition, 500);
   });
 
-  win.setTitle('Angel'); // set before load
+  win.setTitle('Angel X'); // set before load
 
   win.webContents.on('did-finish-load', () => {
     win.show();
     win.focus();
     win.moveTop();
-    win.setTitle('Angel');
+    win.setTitle('Angel X');
     if (savedSettings.compactMode) {
       compactMode = true;
       send('compact:changed', { compact: true });
@@ -1729,14 +1729,14 @@ function updateTray() {
   const currentBgOpacity = Math.round((settings.backgroundOpacity != null ? settings.backgroundOpacity : 0.85) * 100);
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Angel AI — Transparent Cyberpunk Assistant', enabled: false },
+    { label: 'Angel X — Cyberpunk Desktop AI HUD', enabled: false },
     { type: 'separator' },
     {
-      label: isVisible ? 'Hide Angel' : 'Show Angel',
+      label: isVisible ? 'Hide Angel X' : 'Show Angel X',
       click: () => toggleWindowVisibility()
     },
     {
-      label: '⚡ Center Angel on Screen',
+      label: '⚡ Center Angel X on Screen',
       click: () => centerWindow()
     },
     {
@@ -1852,13 +1852,13 @@ function updateTray() {
     },
     { type: 'separator' },
     {
-      label: 'Quit Angel',
+      label: 'Quit Angel X',
       click: () => app.quit()
     }
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(`Angel Assistant (${clickThroughMode ? 'Click-Through Active' : 'Interactive'}${compactMode ? ' · Compact' : ''})`);
+  tray.setToolTip(`Angel X Assistant (${clickThroughMode ? 'Click-Through Active' : 'Interactive'}${compactMode ? ' · Compact' : ''})`);
 }
 
 function createTray() {
@@ -1866,7 +1866,7 @@ function createTray() {
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
-    tray.setToolTip('Angel Assistant — Transparent Cyberpunk Desktop AI');
+    tray.setToolTip('Angel X Assistant — Transparent Cyberpunk Desktop AI');
     tray.on('click', () => toggleWindowVisibility());
     updateTray();
   } catch (err) {
@@ -2053,7 +2053,7 @@ function createPermissionsWindow() {
     resizable: false,
     skipTaskbar: false,
     fullscreenable: false,
-    title: 'Angel',
+    title: 'Angel X',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -2166,9 +2166,9 @@ function launchApp() {
 
 // -------- lifecycle --------
 app.whenReady().then(async () => {
-  app.setName('Angel');
+  app.setName('Angel X');
   if (isWindows) {
-    process.title = 'Angel';
+    process.title = 'Angel X';
   }
 
   // publik usage telemetry v1: app_opened now, active_session every 30 minutes.

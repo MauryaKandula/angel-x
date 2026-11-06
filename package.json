@@ -1,14 +1,14 @@
 {
-  "name": "angel-ai",
-  "productName": "Angel",
+  "name": "angel-x",
+  "productName": "Angel X",
   "version": "1.0.0",
-  "description": "Angel AI — High-Performance Cyberpunk Transparent Desktop AI Overlay for Windows with Universal GPT & Local Whisper STT",
+  "description": "Angel X — High-Performance Cyberpunk Transparent Desktop AI Overlay for Windows with Universal GPT & Local Whisper STT",
   "license": "GPL-3.0-or-later",
   "author": "Kandula Paul Saketh Maurya <mauryakpsofficial@gmail.com>",
-  "homepage": "https://github.com/MauryaKandula/angel-ai",
+  "homepage": "https://github.com/MauryaKandula/angel-x",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MauryaKandula/angel-ai.git"
+    "url": "https://github.com/MauryaKandula/angel-x.git"
   },
   "main": "main.js",
   "scripts": {

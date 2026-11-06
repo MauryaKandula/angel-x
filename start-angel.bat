@@ -1,6 +1,6 @@
 @echo off
-title Angel Assistant Launcher
+title Angel X HUD Launcher
 cd /d "%~dp0"
-echo Starting Angel Cyberpunk Desktop Assistant...
+echo Starting Angel X Cyberpunk Desktop Assistant...
 start "" "node_modules\electron\dist\Angel.exe" .
 exit
