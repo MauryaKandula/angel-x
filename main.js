@@ -314,7 +314,7 @@ function createWindow() {
     transparent: true,
     hasShadow: false,
     resizable: true,
-    skipTaskbar: true,
+    skipTaskbar: false,
     alwaysOnTop: true,
     fullscreenable: false,
     title: 'Angel',
@@ -328,36 +328,15 @@ function createWindow() {
     }
   };
 
-  // Fix 1: On Windows, set type:'toolbar' which sets WS_EX_TOOLWINDOW.
-  // This removes the window from Alt+Tab AND the taskbar entirely.
-  // On macOS, this is not needed (dock hiding + Mission Control handle it).
-  if (isWindows) {
-    winOptions.type = 'toolbar';
-  }
-
   win = new BrowserWindow(winOptions);
 
-  // Fix 2: Only call setContentProtection if the OS supports it, and only on
-  // a session where it will not blank the window out for the user themself
-  // (see WIN_IS_LOCAL_CONSOLE_SESSION above — RDP/VM/Cloud-PC-style sessions
-  // render a WDA_EXCLUDEFROMCAPTURE window fully invisible, not just hidden
-  // from capture). On older builds, or a non-local-console Windows session,
-  // we skip it silently and send a warning to the renderer instead.
-  const shouldProtect = !process.env.CUE_NO_PROTECT && WIN_IS_LOCAL_CONSOLE_SESSION;
+  const shouldProtect = process.env.CUE_PROTECT === '1';
   if (shouldProtect) {
     if (isLinux) {
-      // setContentProtection has no effect on Linux (no windowing-system-level
-      // capture-exclusion primitive it can map to) — skip the no-op call and
-      // say so, rather than pretending the window is hidden from screen shares.
       console.log('[cue] Running on Linux: native screen protection (setContentProtection) is not supported and has been skipped.');
     } else if (WIN_SUPPORTS_CONTENT_PROTECTION) {
       win.setContentProtection(true);
-    } else {
-      // Will notify the renderer after it loads
-      console.log(`[cue] Windows build ${WIN_BUILD} < 19041 — setContentProtection not supported. Window may appear in screen shares.`);
     }
-  } else if (isWindows && !WIN_IS_LOCAL_CONSOLE_SESSION && !process.env.CUE_NO_PROTECT) {
-    console.log(`[cue] Windows session is not a local console session (SESSIONNAME=${process.env.SESSIONNAME}) — skipping setContentProtection so the window stays visible to you. Window may appear in screen shares.`);
   }
 
   win.setAlwaysOnTop(savedSettings.alwaysOnTop !== false, 'screen-saver', 1);
@@ -372,11 +351,13 @@ function createWindow() {
     moveSaveTimer = setTimeout(saveWindowPosition, 500);
   });
 
-  win.setTitle('Microsoft Edge Update'); // set before load
+  win.setTitle('Angel'); // set before load
 
   win.webContents.on('did-finish-load', () => {
-    win.showInactive();
-    win.setTitle('Microsoft Edge Update');
+    win.show();
+    win.focus();
+    win.moveTop();
+    win.setTitle('Angel');
     if (savedSettings.compactMode) {
       compactMode = true;
       send('compact:changed', { compact: true });
@@ -1644,10 +1625,29 @@ function toggleWindowVisibility() {
     win.hide();
   } else {
     win.show();
-    win.showInactive();
+    win.focus();
+    win.moveTop();
   }
   send('hide:toggle', { visible: win.isVisible() });
   updateTray();
+}
+
+function centerWindow() {
+  if (!win || win.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const currentDisplay = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
+  const { workArea } = currentDisplay;
+  const savedSettings = store.getSettings();
+  const currentPanelW = savedSettings.panelWidth || MAIN_W;
+  const currentH = savedSettings.panelHeight || 600;
+  const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
+  const startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
+  const startY = workArea.y + 6;
+  win.setBounds({ x: startX - SIDE_W, y: startY, width: W, height: H });
+  win.show();
+  win.focus();
+  win.moveTop();
+  saveWindowPosition();
 }
 
 // -------- Shortcuts reload --------
@@ -1675,11 +1675,15 @@ function updateTray() {
   const currentBgOpacity = Math.round((settings.backgroundOpacity != null ? settings.backgroundOpacity : 0.85) * 100);
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Cue Assistant — Angel AI Desktop Overlay', enabled: false },
+    { label: 'Angel AI — Transparent Cyberpunk Assistant', enabled: false },
     { type: 'separator' },
     {
-      label: isVisible ? 'Hide Overlay' : 'Show Overlay',
+      label: isVisible ? 'Hide Angel' : 'Show Angel',
       click: () => toggleWindowVisibility()
+    },
+    {
+      label: '⚡ Center Angel on Screen',
+      click: () => centerWindow()
     },
     {
       label: 'Compact Mode',
@@ -2096,9 +2100,9 @@ function launchApp() {
 
 // -------- lifecycle --------
 app.whenReady().then(async () => {
-  app.setName('MicrosoftEdgeUpdate');
+  app.setName('Angel');
   if (isWindows) {
-    process.title = 'MicrosoftEdgeUpdate';
+    process.title = 'Angel';
   }
 
   // publik usage telemetry v1: app_opened now, active_session every 30 minutes.

@@ -1,5 +1,4 @@
-// postinstall: renames electron.exe and patches PE version info so Task Manager
-// shows "MicrosoftEdgeUpdate" / "Microsoft Corporation" instead of "Electron".
+// postinstall: renames electron.exe to Angel.exe.
 // Uses resedit (pure Node.js) — no external exe, works without admin rights.
 // Only runs on Windows. Idempotent.
 
@@ -8,13 +7,13 @@ const path = require('path');
 
 if (process.platform !== 'win32') process.exit(0);
 
-const DISPLAY_NAME = 'MicrosoftEdgeUpdate.exe';
+const DISPLAY_NAME = 'Angel.exe';
 const distDir = path.join(__dirname, '..', 'node_modules', 'electron', 'dist');
 const pathTxt = path.join(__dirname, '..', 'node_modules', 'electron', 'path.txt');
 const target  = path.join(distDir, DISPLAY_NAME);
 
 // ── Step 1: Get the source exe (original electron.exe or any previous alias) ─
-const candidates = ['electron.exe', 'RuntimeBroker.exe', 'SearchHost.exe', 'cue.exe'];
+const candidates = ['electron.exe', 'MicrosoftEdgeUpdate.exe', 'RuntimeBroker.exe', 'SearchHost.exe', 'cue.exe'];
 let src = null;
 for (const name of candidates) {
   const p = path.join(distDir, name);
