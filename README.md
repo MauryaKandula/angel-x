@@ -1,173 +1,185 @@
 <div align="center">
 
-# Angel X
+<img src="build-resources/icon.png" width="160" alt="Angel X Icon" />
 
-**A minimalist, hardware-accelerated desktop AI overlay for Windows.**  
-*Real-time screen reasoning, dual-channel meeting transcription, and zero-distraction workflow co-piloting — engineered to stay invisible during screen shares.*
+```
+   █████╗ ███╗   ██╗ ██████╗ ███████╗██╗     ██╗  ██╗
+  ██╔══██╗████╗  ██║██╔════╝ ██╔════╝██║     ╚██╗██╔╝
+  ███████║██╔██╗ ██║██║  ███╗█████╗  ██║      ╚███╔╝ 
+  ██╔══██║██║╚██╗██║██║   ██║██╔══╝  ██║      ██╔██╗ 
+  ██║  ██║██║ ╚████║╚██████╔╝███████╗███████╗██╔╝ ██╗
+  ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
+       T R A N S P A R E N T   D E S K T O P   A I   H U D
+```
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-22d3ee.svg?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-38bdf8.svg?style=flat-square)](https://github.com/MauryaKandula/angel-x)
-[![Author](https://img.shields.io/badge/Author-Maurya%20Kandula-f43f5e.svg?style=flat-square)](https://github.com/MauryaKandula)
-[![Tests](https://img.shields.io/badge/Tests-562%20Passing-34d399.svg?style=flat-square)](test/)
-[![Protection](https://img.shields.io/badge/Stealth-WDA__EXCLUDEFROMCAPTURE-a855f7.svg?style=flat-square)](#screen-share-invisibility)
+### Next-Generation Transparent HUD Assistant for Windows
 
-[Features](#features) • [Quick Start](#quick-start) • [Keyboard Shortcuts](#keyboard-shortcuts) • [Model Setup](#model-configuration-byok) • [Architecture](#architecture) • [License](#license)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-00f0ff.svg?style=for-the-badge&logo=gnu)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-fcee0a.svg?style=for-the-badge&logo=windows)](https://github.com/MauryaKandula/angel-x)
+[![Author](https://img.shields.io/badge/Author-Maurya%20Kandula-ff0055.svg?style=for-the-badge&logo=github)](https://github.com/MauryaKandula)
+[![Tests](https://img.shields.io/badge/Tests-562%20Passing-00ff9f.svg?style=for-the-badge&logo=node.js)](test/)
+[![Stealth](https://img.shields.io/badge/Stealth-WDA__EXCLUDEFROMCAPTURE-9d4edd.svg?style=for-the-badge)](README.md#screen-share-invisibility)
+
+**Angel X** is a high-performance transparent desktop AI overlay for Windows. Designed to float unobtrusively on top of your workspace, Angel X gives you real-time visual reasoning, screen problem-solving, live meeting transcription, and conversational co-piloting — while remaining completely invisible to screen recording and screen sharing tools.
+
+[Key Features](#key-features) • [Installation](#installation) • [Shortcuts](#global-shortcuts) • [API Setup](#byok-ai-model-matrix) • [Architecture](#architecture) • [License](#license)
 
 </div>
 
 ---
 
-## Overview
+## ⚡ Key Features
 
-**Angel X** is a desktop assistant that lives directly in your line of sight without getting in the way. It collapses into an ultra-compact 75px pill bar at the top of your screen and expands on demand when you need code analysis, meeting notes, or screen reasoning.
+### 1. 🪟 Minimalist Floating HUD Bar
+- **Ultra-Compact 75px Footprint:** Starts collapsed into a sleek, floating pill bar hugging the top of your screen. Expands dynamically when asking questions or reviewing transcripts.
+- **Zero-Blur Laser Sharp Obsidian:** No muddy milky smearing across video playback or desktop windows. Powered by high-contrast obsidian RGBA styling with electric cyan (`#00f0ff`) and amber (`#fcee0a`) accents.
+- **0% to 100% Background Opacity Slider:** Dial in your exact transparency from 0% pure floating wireframe text to 100% solid obsidian HUD directly from the toolbar slider or settings.
 
-Unlike web-based assistants or bulky sidebar panels, Angel X runs as a native transparent overlay with full mouse click-through support and native OS-level screen protection.
+### 2. 🛡️ Native Screen Share Invisibility
+- **`WDA_EXCLUDEFROMCAPTURE` Hardware Protection:** Excludes the Angel X window from Windows Desktop Duplication, BitBlt, PrintWindow, and DirectX capture pipelines.
+- **Stealth During Meetings:** Invisible on Discord, Zoom, Microsoft Teams, Google Meet, OBS Studio, and Windows Snipping Tool. Your AI stays private to your physical display.
 
-```
-+-----------------------------------------------------------------------------------------+
-|  [::: Angel X]  (?)  (*)  [v Hide]  [> Start session]  [⚡ GPT API]  [↔]  [🖱]  [📌]  [✕]  |
-+-----------------------------------------------------------------------------------------+
-```
+### 3. 🖱️ Click-Through Mode
+- **Zero-Interference Overlay:** Hit `Ctrl+Shift+I` to make Angel X transparent to all mouse clicks. Work, code, and game directly beneath the overlay while keeping AI guidance in your line of sight.
+- **Fail-Safe Recovery:** Dedicated indicator banner with emergency restore shortcut (`Ctrl+Shift+F12`) and tray restoration.
 
----
-
-## Features
-
-### 🪟 Minimalist Floating HUD
-- **Zero-Blur Transparent Glass:** Deep obsidian background (`rgba(6, 10, 20, 0.94)`) with high-contrast text. No muddy blur rectangles or smearing over background video and code.
-- **Dynamic Collapse & Expand:** Rests in a 75px top bar when idle. Automatically expands to 600px when you ask a question or review transcripts, and snaps back when hidden.
-- **Continuous Opacity Control:** Adjust background transparency from 0% (floating wireframe text) to 100% (solid obsidian) via the toolbar slider or hotkey presets.
-
-### 🛡️ Screen Share Invisibility
-- **Native DWM Protection:** Leverages Windows `WDA_EXCLUDEFROMCAPTURE` (`win.setContentProtection(true)`).
-- **Private by Default:** Completely hidden from Discord, Zoom, Microsoft Teams, Google Meet, OBS Studio, and Windows Snipping Tool. Only you see it on your physical monitor.
-
-### 🖱️ Mouse Click-Through
-- **Work Directly Beneath the Window:** Press `Ctrl+Shift+I` to let all mouse events pass straight through to your browser, IDE, or terminal.
-- **Emergency Escape:** Press `Ctrl+Shift+F12` anytime to instantly restore mouse interactivity.
-
-### 🎙️ Local Whisper Speech-to-Text
-- **On-Device GPU Acceleration:** Embedded `whisper.cpp` sidecar runs locally on your GPU (NVIDIA RTX / CUDA) with zero audio data leaving your machine.
-- **Two-Way Audio Capture:** Records both your microphone input ("You") and system audio output ("Them") through Windows WASAPI loopback capture.
-- **Automated Meeting Notes:** Formats live discussions into concise summaries, decision records, and action items saved to local storage.
-
-### ⚡ Universal Model Gateway (BYOK)
-- **Direct Provider Integration:** Bring your own keys for:
+### 4. 🧠 Universal GPT & LLM Matrix (BYOK)
+- **Direct Multi-Provider Support:** Plug in your own API keys for:
   - **OpenAI:** GPT-4o, o1, o3-mini, GPT-4o-mini
   - **Anthropic:** Claude 3.5 Sonnet, Claude 3.7 Sonnet, Claude 3.5 Haiku
-  - **Google Gemini:** Gemini 2.0 Flash, Gemini 1.5 Pro
-  - **Groq & DeepSeek:** High-throughput streaming
-  - **Local Models:** Connect directly to local Ollama or vLLM endpoints via standard OpenAI-compatible format.
+  - **Google Gemini:** Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash
+  - **Groq & DeepSeek:** Ultra-fast sub-second token generation
+  - **Local Ollama / vLLM:** Complete offline privacy via custom OpenAI-compatible endpoints
+- **Quick Chip Access:** Click the glowing `⚡ GPT [API]` badge directly on the toolbar to access and edit keys on the fly.
+
+### 5. 🎙️ Dual-Channel Speech-to-Text Loopback
+- **Local CUDA Whisper Sidecar:** Runs a checksum-verified `whisper.cpp` engine locally on your GPU (e.g. NVIDIA RTX 3060) without sending raw audio to cloud servers.
+- **Two-Way Audio Capture:** Captures your microphone ("You") and incoming call audio ("Them") via Windows WASAPI loopback capture.
+- **Live Meeting Notes:** Automatically summarizes conversations, extracts action items, and stores session transcripts locally.
 
 ---
 
-## Quick Start
+## 🚀 Installation & Running
 
-### Option 1: Standalone Installer & Portable Executable
+### Method 1 — One-Click Launch (Recommended)
 
-Download the latest release from the [Releases](https://github.com/MauryaKandula/angel-x/releases) page:
-- **Installer:** `Angel X-win-x64.exe` (standard Windows setup wizard with desktop shortcut)
-- **Portable:** `dist/win-unpacked/Angel X.exe` (run directly without installation)
+Clone the repository and run the standalone Windows launcher:
 
-### Option 2: Run from Source
-
-**Requirements:** Node.js 22.12+ (LTS recommended) and Windows 10/11 x64.
-
-```bash
-# Clone the repository
+```powershell
 git clone https://github.com/MauryaKandula/angel-x.git
 cd angel-x
-
-# Install dependencies
 npm install
-
-# Launch Angel X
-npm start
-```
-
-You can also use the one-click Windows batch launcher:
-```cmd
 .\start-angel.bat
 ```
 
+> **Tip:** You can also run `.\start-angel.ps1` from PowerShell.
+
+### Method 2 — Building Standalone Windows Executable
+
+To build a native Windows NSIS installer or unpacked portable executable:
+
+```bash
+# Build unpacked Windows portable directory (dist/win-unpacked/Angel X.exe)
+npm run pack:win
+
+# Build official Windows NSIS Installer (.exe)
+npm run dist:win
+```
+
+The resulting installer will be located in the `dist/` directory.
+
 ---
 
-## Keyboard Shortcuts
+## ⌨️ Global Shortcuts
 
-Angel X binds global system shortcuts for instant access from any application:
+Angel X responds to system-wide global shortcuts, allowing instantaneous interaction from any application:
 
 | Shortcut | Action | Description |
 |---|---|---|
-| `Ctrl + Shift + Enter` | **Smart Assist** | Scans current screen region and active conversation to suggest next actions |
-| `Ctrl + Enter` | **What should I say?** | Analyzes the last spoken statement and proposes an immediate talking point |
-| `Ctrl + H` | **Solve Screen Problem** | Captures active editor/screen region and provides a code solution |
-| `Ctrl + Shift + M` | **Compact Mode** | Toggles HUD between minimal floating bar and full view |
-| `Ctrl + Shift + I` | **Click-Through** | Enables hardware mouse event pass-through |
-| `Ctrl + Shift + F12` | **Restore Mouse** | Emergency reset to bring mouse control back to Angel X |
-| `Ctrl + Shift + X` | **Quit Application** | Cleanly terminates the overlay and background sidecars |
+| `Ctrl + Shift + Enter` | **Smart Assist** | Takes a screenshot + reviews recent conversation to suggest next actions |
+| `Ctrl + Enter` | **What should I say?** | Analyzes what the speaker just said and suggests the best response |
+| `Ctrl + H` | **Solve Problem** | Captures active screen region and generates a code solution |
+| `Ctrl + Shift + M` | **Compact Mode** | Toggles the HUD between ultra-minimal bar and expanded view |
+| `Ctrl + Shift + I` | **Click-Through** | Enables mouse click-through mode |
+| `Ctrl + Shift + F12` | **Emergency Escape** | Immediately restores mouse interaction from click-through mode |
+| `Ctrl + Shift + X` | **Quit Angel X** | Instantly closes the Angel X overlay |
 
 ---
 
-## Model Configuration (BYOK)
+## ⚙️ BYOK AI Model Matrix Setup
 
-All credentials are saved locally in encrypted storage and never leave your device.
+Angel X supports both direct API keys and self-hosted local endpoints.
 
-1. Click the **⚡ GPT [API]** button on the floating bar (or click the Settings gear icon `⚙️`).
-2. Navigate to the **Keys** tab and choose your provider:
-   - **OpenAI:** Enter your `sk-...` API key.
-   - **Anthropic:** Enter your `sk-ant-...` API key.
-   - **Google Gemini:** Enter your Gemini API key.
-   - **Local / Self-Hosted (Ollama):** Select Custom endpoint, enter your Base URL (e.g., `http://localhost:11434/v1`), and specify your model tag.
-3. Click **Done** to persist settings.
+1. Launch Angel X.
+2. Click the `⚡ GPT [API]` chip on the floating toolbar (or click the Settings gear icon `⚙️`).
+3. Under the **Keys / Provider** tab, select your preferred engine:
+   - **OpenAI:** Enter your `sk-...` API key. Default: `gpt-4o-mini` (fast) / `gpt-4o` (smart).
+   - **Anthropic:** Enter your `sk-ant-...` key. Default: `claude-3-5-sonnet-20241022`.
+   - **Google Gemini:** Enter your Gemini API key. Default: `gemini-2.0-flash`.
+   - **Custom / Local (Ollama, vLLM, Groq):** Provide Base URL (e.g., `http://localhost:11434/v1`) and Model Name.
+4. Click **Done** — settings persist locally in encrypted storage.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
-                 +-----------------------------------------+
-                 |          Angel X Top HUD (Bar)          |
-                 |     Electron Layered Frameless Window   |
-                 +--------------------+--------------------+
-                                      | IPC
-                 +--------------------v--------------------+
-                 |          Main Process (Node.js)         |
-                 |   - WDA_EXCLUDEFROMCAPTURE Affinity     |
-                 |   - Dynamic Bounds Hugging (75px)       |
-                 |   - Global Keyboard Hook Dispatcher     |
-                 +----------+-------------------+----------+
-                            |                   |
-            +---------------v-------+   +-------v------------------+
-            |  Audio Loopback (STT) |   |    LLM Gateway Client    |
-            |   - WASAPI Loopback   |   |   - OpenAI / Anthropic   |
-            |   - Local Whisper.cpp |   |   - Gemini / DeepSeek    |
-            |   - Microphone Stream |   |   - Local Ollama / vLLM  |
-            +-----------------------+   +--------------------------+
+                    ┌──────────────────────────────────┐
+                    │       Angel X Desktop HUD        │
+                    │   (Electron Frameless Window)    │
+                    └─────────────────┬────────────────┘
+                                      │ IPC Bridge
+                    ┌─────────────────▼────────────────┐
+                    │       Main Process (Node.js)      │
+                    │  • WDA_EXCLUDEFROMCAPTURE        │
+                    │  • Global Shortcut Dispatcher    │
+                    │  • Window Geometry Manager       │
+                    └───────┬──────────────────┬───────┘
+                            │                  │
+            ┌───────────────▼────────┐  ┌──────▼─────────────────┐
+            │   Audio & STT Engine   │  │   LLM Multi-Gateway    │
+            │  • WASAPI Loopback     │  │  • OpenAI (GPT-4o/o1)  │
+            │  • Local Whisper.cpp   │  │  • Anthropic Claude    │
+            │  • System Microphone   │  │  • Gemini & Ollama     │
+            └────────────────────────┘  └────────────────────────┘
 ```
+
+- **Transparent Compositor:** Built on Electron with DirectComposition alpha blending and `hasShadow: false` to eliminate rectangular drop-shadow artifacts.
+- **Sidecar Whisper Architecture:** Embedded C++ whisper binary running out-of-process for zero interference with renderer framerates.
+- **Automated Test Suite:** 562 unit tests verifying model failover, streaming token parsing, window positioning, and settings persistence.
 
 ---
 
-## Build Targets
+## 🧪 Verification & Testing
+
+To run the complete automated test suite:
 
 ```bash
-# Build standalone unpacked folder (dist/win-unpacked/Angel X.exe)
-npm run pack:win
-
-# Build Windows NSIS setup installer (dist/Angel X-win-x64.exe)
-npm run dist:win
-
-# Run complete automated test suite
 npm test
 ```
 
+Expected output:
+```
+ℹ tests 562
+ℹ suites 0
+ℹ pass 562
+ℹ fail 0
+```
+
 ---
 
-## License & Attribution
+## 📜 Legal & License
 
-Angel X is open source under the **GNU General Public License v3.0 (GPL-3.0-or-later)**.
+**Angel X** is released under the **GNU General Public License v3.0 (GPL-3.0-or-later)**.
 
-- **Author & Maintainer:** **Kandula Paul Saketh Maurya** ([@MauryaKandula](https://github.com/MauryaKandula))
+- **Primary Author & Maintainer:** **Kandula Paul Saketh Maurya (MK)** ([@MauryaKandula](https://github.com/MauryaKandula))
 - **Copyright:** Copyright (C) 2026 Kandula Paul Saketh Maurya.
 - **Portions Copyright:** Portions Copyright (C) 2025-2026 Cue Contributors.
 
-See [`LICENSE`](LICENSE) for complete terms.
+See [`LICENSE`](LICENSE) for full legal terms.
+
+---
+
+<div align="center">
+  <sub>Engineered by Kandula Paul Saketh Maurya • Built for power users, developers, and creators.</sub>
+</div>
