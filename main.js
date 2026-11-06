@@ -330,7 +330,7 @@ function createWindow() {
 
   win = new BrowserWindow(winOptions);
 
-  const shouldProtect = process.env.CUE_PROTECT === '1';
+  const shouldProtect = !process.env.CUE_NO_PROTECT && (savedSettings.screenProtection !== false);
   if (shouldProtect) {
     if (isLinux) {
       console.log('[cue] Running on Linux: native screen protection (setContentProtection) is not supported and has been skipped.');
@@ -1595,6 +1595,19 @@ function toggleAlwaysOnTop() {
 ipcMain.handle('always-on-top:toggle', () => toggleAlwaysOnTop());
 ipcMain.handle('always-on-top:set', (_e, v) => { setAlwaysOnTop(v); return v; });
 
+// -------- Screen Protection (Screen share invisibility) --------
+ipcMain.handle('screen-protection:toggle', () => {
+  const settings = store.getSettings();
+  const next = settings.screenProtection === false ? true : false;
+  store.setSettings({ screenProtection: next });
+  if (win && !win.isDestroyed() && WIN_SUPPORTS_CONTENT_PROTECTION) {
+    win.setContentProtection(next);
+  }
+  updateTray();
+  return next;
+});
+ipcMain.handle('screen-protection:get', () => store.getSettings().screenProtection !== false);
+
 // -------- Window resizing --------
 let resizeSaveTimer = null;
 ipcMain.on('window:resize', (_e, dims) => {
@@ -1702,6 +1715,18 @@ function updateTray() {
       type: 'checkbox',
       checked: isTop,
       click: () => toggleAlwaysOnTop()
+    },
+    {
+      label: 'Screen Share Protection (Invisible on Stream/Share)',
+      type: 'checkbox',
+      checked: win && !win.isDestroyed() && (store.getSettings().screenProtection !== false),
+      click: (item) => {
+        store.setSettings({ screenProtection: item.checked });
+        if (win && !win.isDestroyed() && WIN_SUPPORTS_CONTENT_PROTECTION) {
+          win.setContentProtection(item.checked);
+        }
+        updateTray();
+      }
     },
     { type: 'separator' },
     {

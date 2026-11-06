@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('cue', {
   compactSet: (v) => ipcRenderer.invoke('compact:set', v),
   alwaysOnTopToggle: () => ipcRenderer.invoke('always-on-top:toggle'),
   alwaysOnTopSet: (v) => ipcRenderer.invoke('always-on-top:set', v),
+  screenProtectionToggle: () => ipcRenderer.invoke('screen-protection:toggle'),
+  screenProtectionGet: () => ipcRenderer.invoke('screen-protection:get'),
   windowResize: (dims) => ipcRenderer.send('window:resize', dims),
   shortcutsReload: () => ipcRenderer.invoke('shortcuts:reload'),
   screenCaptureAnalyze: () => ipcRenderer.invoke('screen:capture-analyze'),

@@ -632,24 +632,35 @@
 
   // Hide / collapse
   let reopenSidebarOnExpand = false;
-  function toggleHide() {
-    const collapsed = $('#panel-wrap').classList.toggle('collapsed');
+  function toggleHide(force) {
+    const pw = $('#panel-wrap');
+    if (!pw) return;
+    const shouldCollapse = force !== undefined ? !!force : !pw.classList.contains('collapsed');
+    pw.classList.toggle('collapsed', shouldCollapse);
     const btn = $('#hide-btn');
-    btn.classList.toggle('collapsed', collapsed);
-    const label = btn.querySelector('.tb-hide-label');
-    const text = collapsed ? 'Show' : 'Hide';
-    if (label) label.textContent = text;
-    btn.title = text;
-    btn.setAttribute('aria-label', text);
-    if (collapsed) {
+    if (btn) {
+      btn.classList.toggle('collapsed', shouldCollapse);
+      const label = btn.querySelector('.tb-hide-label');
+      const text = shouldCollapse ? 'Show' : 'Hide';
+      if (label) label.textContent = text;
+      btn.title = text;
+      btn.setAttribute('aria-label', text);
+    }
+    if (shouldCollapse) {
       reopenSidebarOnExpand = sidebarOpen;
       if (sidebarOpen) hideSidebar();
     } else if (reopenSidebarOnExpand) {
       showSidebar();
     }
   }
-  $('#hide-btn').addEventListener('click', toggleHide);
-  cue.on('hide:toggle', toggleHide);
+  function expandPanel() {
+    const pw = $('#panel-wrap');
+    if (pw && pw.classList.contains('collapsed')) {
+      toggleHide(false);
+    }
+  }
+  $('#hide-btn').addEventListener('click', () => toggleHide());
+  cue.on('hide:toggle', () => toggleHide());
 
   const OPACITY_MIN = 0.2;
   function clampOpacity(value) {
@@ -681,6 +692,7 @@
       settings.opacity = clampOpacity(Math.max(0.2, bgOpacity));
     }
     document.documentElement.style.setProperty('--cue-bg-opacity', String(bgOpacity));
+    document.documentElement.setAttribute('data-cue-opacity', bgOpacity === 0 ? '0' : '1');
     const tb = $('#tb-opacity-slider');
     const tbVal = $('#tb-opacity-value');
     const s = $('#s-opacity-slider');
@@ -867,6 +879,7 @@
   // Stop = start/stop listening. Kick off system-audio capture straight from the click so
   // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
   $('#stop-btn').addEventListener('click', async () => {
+    expandPanel();
     const turningOn = !$('#stop-btn').classList.contains('active');
     if (turningOn) {
       // startSystemAudio may fail (user cancels, no permission) — that's OK,
@@ -2747,6 +2760,7 @@
     applyOpacity(settings.backgroundOpacity !== undefined ? settings.backgroundOpacity : settings.opacity, false);
     if (settings.alwaysOnTop !== undefined) applyAlwaysOnTop(settings.alwaysOnTop !== false);
     if (settings.compactMode) applyCompactMode(true);
+    if (settings.startCollapsed !== false) toggleHide(true);
     if (settings.panelWidth) document.documentElement.style.setProperty('--main-w', settings.panelWidth + 'px');
 
     const st = await cue.captureState();

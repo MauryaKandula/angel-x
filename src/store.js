@@ -79,6 +79,8 @@ const DEFAULTS = {
   // Floating assistant window mode and topmost controls
   alwaysOnTop: true,
   compactMode: false,
+  startCollapsed: true,
+  screenProtection: true,
   clickThrough: false,
   panelWidth: 700,
   panelHeight: 600,
