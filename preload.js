@@ -20,6 +20,15 @@ contextBridge.exposeInMainWorld('cue', {
   micPcm: (arrayBuffer) => ipcRenderer.send('mic:pcm', arrayBuffer),
   systemPcm: (arrayBuffer) => ipcRenderer.send('system:pcm', arrayBuffer),
   setIgnoreMouse: (v) => ipcRenderer.send('mouse:ignore', v),
+  clickThroughToggle: () => ipcRenderer.invoke('click-through:toggle'),
+  clickThroughSet: (v) => ipcRenderer.invoke('click-through:set', v),
+  compactToggle: () => ipcRenderer.invoke('compact:toggle'),
+  compactSet: (v) => ipcRenderer.invoke('compact:set', v),
+  alwaysOnTopToggle: () => ipcRenderer.invoke('always-on-top:toggle'),
+  alwaysOnTopSet: (v) => ipcRenderer.invoke('always-on-top:set', v),
+  windowResize: (dims) => ipcRenderer.send('window:resize', dims),
+  shortcutsReload: () => ipcRenderer.invoke('shortcuts:reload'),
+  screenCaptureAnalyze: () => ipcRenderer.invoke('screen:capture-analyze'),
   windowDragStart: () => ipcRenderer.send('window:drag-start'),
   windowDragEnd: () => ipcRenderer.send('window:drag-end'),
   clearTranscript: () => ipcRenderer.invoke('transcript:clear'),
@@ -44,7 +53,7 @@ contextBridge.exposeInMainWorld('cue', {
   permissionsContinue: () => ipcRenderer.send('permissions:continue'),
   log: (msg) => ipcRenderer.send('log', msg),
   on: (channel, cb) => {
-    const allowed = ['capture:state', 'llm:start', 'llm:thinking', 'llm:token', 'llm:done', 'llm:error', 'status', 'transcript', 'transcript:restore', 'stt:interim', 'stt:final', 'stt:status', 'vad:state', 'applink:consent-request', 'hide:toggle', 'whisper:download-progress', 'whisper:models-changed', 'publik:state', 'slides:update'];
+    const allowed = ['capture:state', 'llm:start', 'llm:thinking', 'llm:token', 'llm:done', 'llm:error', 'status', 'transcript', 'transcript:restore', 'stt:interim', 'stt:final', 'stt:status', 'vad:state', 'applink:consent-request', 'hide:toggle', 'whisper:download-progress', 'whisper:models-changed', 'publik:state', 'slides:update', 'click-through:changed', 'compact:changed', 'always-on-top:changed', 'opacity:set', 'shortcuts:updated', 'settings:open', 'settings:open-gpt'];
     if (!allowed.includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => cb(data));
   }

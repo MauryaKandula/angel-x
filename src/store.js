@@ -7,6 +7,7 @@
 const { app } = require('electron');
 const { createFileStore } = require('./settings-store-core');
 const { normalizeBaseUrl } = require('./openai-compatible');
+const { DEFAULTS: SHORTCUT_DEFAULTS } = require('./shortcuts');
 
 const fileStore = createFileStore(() => app.getPath('userData'), 'cue-data.json');
 
@@ -73,6 +74,15 @@ const DEFAULTS = {
   aiRules: '',
   // Overlay opacity (1 = fully opaque). Clamped so the window never vanishes.
   opacity: 1,
+  // Background opacity (0 = fully transparent glass background to 1 = solid).
+  backgroundOpacity: 0.85,
+  // Floating assistant window mode and topmost controls
+  alwaysOnTop: true,
+  compactMode: false,
+  clickThrough: false,
+  panelWidth: 700,
+  panelHeight: 600,
+  shortcuts: { ...SHORTCUT_DEFAULTS },
   // Slides: opt-in auto slide tracking (memory-only, forwarded, never written to disk).
   slides: {
     enabled: false,
@@ -125,6 +135,15 @@ function clampOpacity(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 1;
   return Math.min(MAX_OPACITY, Math.max(MIN_OPACITY, Math.round(n * 100) / 100));
+}
+
+const MIN_BG_OPACITY = 0;
+const MAX_BG_OPACITY = 1;
+
+function clampBackgroundOpacity(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0.85;
+  return Math.min(MAX_BG_OPACITY, Math.max(MIN_BG_OPACITY, Math.round(n * 100) / 100));
 }
 
 const RENDERER_READ_ONLY = ['publik'];
@@ -211,6 +230,9 @@ module.exports = {
   MIN_OPACITY,
   MAX_OPACITY,
   clampOpacity,
+  MIN_BG_OPACITY,
+  MAX_BG_OPACITY,
+  clampBackgroundOpacity,
   RENDERER_READ_ONLY,
   applyPublikDefault,
   stripRendererPatch,
@@ -232,6 +254,9 @@ module.exports = {
     const nextSettings = deepMerge(data, patch || {});
     nextSettings.baseUrl = normalizeBaseUrl(nextSettings.baseUrl);
     nextSettings.opacity = clampOpacity(nextSettings.opacity);
+    if ('backgroundOpacity' in nextSettings) {
+      nextSettings.backgroundOpacity = clampBackgroundOpacity(nextSettings.backgroundOpacity);
+    }
     data = nextSettings;
     save();
     return data;

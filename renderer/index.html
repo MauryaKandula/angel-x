@@ -23,20 +23,41 @@
         <span class="ic"></span><span class="tb-stop-label">Start session</span>
       </button>
       <div class="tb-divider"></div>
+      <button class="tb-gpt-chip" id="tb-gpt-btn" title="Access & Edit GPT API Key / Endpoint in Settings" aria-label="Configure GPT API Key">
+        <span class="ic-cpu"></span><span class="tb-gpt-text">GPT</span><span class="tb-gpt-badge" id="tb-gpt-badge">API</span>
+      </button>
+      <div class="tb-divider"></div>
+      <button class="tb-compact" id="compact-btn" title="Toggle Compact Mode (Ctrl+Shift+M)" aria-label="Toggle Compact Mode"><span class="ic"></span></button>
+      <button class="tb-clickthrough" id="clickthrough-btn" title="Toggle Mouse Click-Through (Ctrl+Shift+I)" aria-label="Toggle Mouse Click-Through"><span class="ic"></span></button>
+      <button class="tb-pin" id="pin-btn" title="Toggle Always On Top" aria-label="Toggle Always On Top"><span class="ic"></span></button>
+      <div class="tb-divider"></div>
       <div class="tb-opacity-wrap">
         <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
           <span class="ic"></span>
         </button>
         <div id="opacity-popover" class="opacity-popover hidden">
-          <div class="opacity-label">Opacity</div>
+          <div class="opacity-label">Background Opacity</div>
           <div class="opacity-row">
-            <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" />
-            <span id="tb-opacity-value">100%</span>
+            <input type="range" id="tb-opacity-slider" min="0" max="100" step="1" value="85" />
+            <span id="tb-opacity-value">85%</span>
+          </div>
+          <div class="opacity-presets">
+            <button class="opacity-chip" data-val="0">0% Glass</button>
+            <button class="opacity-chip" data-val="25">25%</button>
+            <button class="opacity-chip" data-val="50">50%</button>
+            <button class="opacity-chip" data-val="75">75%</button>
+            <button class="opacity-chip" data-val="100">Solid</button>
           </div>
         </div>
       </div>
       <div class="tb-divider"></div>
       <button class="tb-quit" id="quit-btn" title="Quit cue" aria-label="Quit cue"></button>
+    </div>
+
+    <!-- Click-through indicator banner -->
+    <div id="clickthrough-banner" class="clickthrough-banner hidden">
+      <span class="clickthrough-dot"></span>
+      <span>Mouse Click-Through Active — Press <kbd>Ctrl+Shift+F12</kbd> or use Tray to disable</span>
     </div>
 
     <!-- Main assistant panel -->
@@ -84,6 +105,7 @@
           </div>
 
         </div><!-- /panel-columns -->
+        <div id="resize-handle" class="resize-handle" title="Drag to resize overlay"><span class="ic"></span></div>
       </div>
 
       <!-- Transcript history sidebar — slides out from behind the panel's right edge -->
@@ -116,6 +138,7 @@
         <button class="s-tab" data-tab="transcription">🔉 Audio</button>
         <button class="s-tab" data-tab="style">✨ Style</button>
         <button class="s-tab" data-tab="appearance">🌗 Appearance</button>
+        <button class="s-tab" data-tab="shortcuts">⌨️ Shortcuts</button>
       </div>
 
       <!-- Tab: publik (first). The publik card comes first; every key and
@@ -146,6 +169,12 @@
         <label class="s-label">Models <span class="s-hint">fast = Smart off · smart = Smart on</span></label>
         <div class="s-field"><span>Fast</span><input id="model-fast" type="text" autocomplete="off" /></div>
         <div class="s-field"><span>Smart</span><input id="model-smart" type="text" autocomplete="off" /></div>
+        <div class="model-presets">
+          <span class="preset-label">GPT Presets:</span>
+          <button type="button" class="s-chip model-chip" data-fast="gpt-4o-mini" data-smart="gpt-4o">⚡ GPT-4o</button>
+          <button type="button" class="s-chip model-chip" data-fast="o3-mini" data-smart="o1">⚡ OpenAI o1/o3</button>
+          <button type="button" class="s-chip model-chip" data-fast="deepseek-chat" data-smart="deepseek-reasoner">⚡ DeepSeek</button>
+        </div>
 
         <label class="s-label">Assistant access <span class="s-hint">programs allowed to see what cue is doing</span></label>
         <div class="s-callers" id="applink-callers"></div>
@@ -153,6 +182,10 @@
         <details id="byo-section" class="byo-section">
           <summary id="byo-summary"><span id="byo-title">Use your own API key instead</span> <span class="s-hint" id="byo-current"></span></summary>
           <div class="byo-body">
+            <div class="cyber-api-callout">
+              <div class="cyber-api-title">⚡ NEURAL LINK: ANY GPT ENGINE</div>
+              <div class="cyber-api-desc">Enter your OpenAI GPT key below (GPT-4o, GPT-4o-mini, o1) or choose <strong>Custom</strong> for any OpenAI-compatible API gateway (OpenRouter, DeepSeek, Local LLM, Ollama, LM Studio).</div>
+            </div>
             <label class="s-label">Provider</label>
             <div class="s-seg" id="provider-seg">
               <button data-provider="cerebras">Cerebras</button>
@@ -285,11 +318,48 @@
 
       <!-- Tab: Appearance -->
       <div class="s-body s-tab-pane hidden" data-pane="appearance">
-        <label class="s-label" for="s-opacity-slider">Opacity <span class="s-hint">how see-through the overlay is</span></label>
+        <label class="s-label" for="s-opacity-slider">Background Opacity <span class="s-hint">0% transparent text overlay to 100% solid glass</span></label>
         <div class="s-opacity-row">
-          <input type="range" id="s-opacity-slider" min="20" max="100" step="1" value="100" />
-          <span id="s-opacity-value">100%</span>
+          <input type="range" id="s-opacity-slider" min="0" max="100" step="1" value="85" />
+          <span id="s-opacity-value">85%</span>
         </div>
+        <div class="s-opacity-presets">
+          <button class="s-chip" data-val="0">0% (Clear Glass)</button>
+          <button class="s-chip" data-val="25">25%</button>
+          <button class="s-chip" data-val="50">50%</button>
+          <button class="s-chip" data-val="75">75%</button>
+          <button class="s-chip" data-val="100">100% (Solid)</button>
+        </div>
+
+        <label class="s-label" style="margin-top: 14px;">Window Behavior</label>
+        <div class="s-field">
+          <span>Always on Top</span>
+          <input id="s-always-on-top" type="checkbox" checked style="width:auto;" />
+        </div>
+        <div class="s-field">
+          <span>Start in Compact Mode</span>
+          <input id="s-compact-mode" type="checkbox" style="width:auto;" />
+        </div>
+        <div class="s-note">Always on Top keeps the assistant floating over normal desktop applications. Compact Mode shrinks the assistant to a minimal floating capsule.</div>
+      </div>
+
+      <!-- Tab: Shortcuts -->
+      <div class="s-body s-tab-pane hidden" data-pane="shortcuts">
+        <label class="s-label">Global Keyboard Shortcuts <span class="s-hint">work system-wide across all applications</span></label>
+        <div class="s-field"><span>Smart assist (Screen + Context)</span><input id="sc-assist" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>What should I say?</span><input id="sc-say" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Coding Problem Solve</span><input id="sc-leetcode" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Show / Hide Assistant</span><input id="sc-hide" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Toggle Compact Mode</span><input id="sc-compact" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Toggle Click-Through</span><input id="sc-passthrough" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Emergency Click-Through Exit</span><input id="sc-emergencyClickThrough" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Capture Screen &amp; Analyze</span><input id="sc-screen" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Quit Cue</span><input id="sc-quit" type="text" autocomplete="off" spellcheck="false" /></div>
+        
+        <div class="whisper-actions" style="margin-top: 14px;">
+          <button id="sc-reset-defaults" class="s-action">Reset to Defaults</button>
+        </div>
+        <div class="s-note">Shortcuts use standard accelerator format, e.g. <code>Ctrl+Shift+Return</code>, <code>Ctrl+H</code>, <code>Ctrl+Shift+F12</code>. Changes apply immediately upon saving.</div>
       </div>
 
 

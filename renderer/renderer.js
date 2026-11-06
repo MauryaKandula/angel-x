@@ -15,7 +15,17 @@
   $('#logo-btn').innerHTML = icon('badge-question-mark', { size: 16 });
   $('#tb-settings-btn').innerHTML = icon('settings', { size: 16 });
   $('.tb-hide .chev').innerHTML = icon('chevron-down', { size: 14 });
+  const compactIc = document.querySelector('#compact-btn .ic');
+  if (compactIc) compactIc.innerHTML = icon('minimize-2', { size: 14 });
+  const ctIc = document.querySelector('#clickthrough-btn .ic');
+  if (ctIc) ctIc.innerHTML = icon('mouse-pointer', { size: 14 });
+  const pinIc = document.querySelector('#pin-btn .ic');
+  if (pinIc) pinIc.innerHTML = icon('pin', { size: 14 });
+  const resizeIc = document.querySelector('#resize-handle .ic');
+  if (resizeIc) resizeIc.innerHTML = icon('grip', { size: 12 });
   $('#opacity-btn .ic').innerHTML = icon('eclipse', { size: 14 });
+  const gptCpuIc = document.querySelector('#tb-gpt-btn .ic-cpu');
+  if (gptCpuIc) gptCpuIc.innerHTML = icon('zap', { size: 13 });
   $('#quit-btn').innerHTML = icon('x', { size: 14 });
   document.querySelector('.act[data-mode="assist"] .ic').innerHTML = icon('monitor', { size: 16 });
   document.querySelector('.act[data-mode="say"] .ic').innerHTML = icon('wand-sparkles', { size: 16 });
@@ -648,18 +658,29 @@
     return Math.min(1, Math.max(OPACITY_MIN, Math.round(n * 100) / 100));
   }
   function opacityToPercent(value) { return Math.round(clampOpacity(value) * 100); }
+
+  function clampBackgroundOpacity(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0.85;
+    return Math.min(1, Math.max(0, Math.round(n * 100) / 100));
+  }
+
   function persistOpacitySoon() {
     clearTimeout(persistOpacitySoon.timer);
     persistOpacitySoon.timer = setTimeout(() => {
       if (!settings) return;
-      cue.settingsSet({ opacity: settings.opacity }).then((next) => { if (next) settings = next; }).catch(() => {});
+      cue.settingsSet({ opacity: settings.opacity, backgroundOpacity: settings.backgroundOpacity }).then((next) => { if (next) settings = next; }).catch(() => {});
     }, 400);
   }
+
   function applyOpacity(value, persist) {
-    const opacity = clampOpacity(value);
-    const percent = opacityToPercent(opacity);
-    if (settings) settings.opacity = opacity;
-    document.documentElement.style.setProperty('--cue-opacity', String(opacity));
+    const bgOpacity = clampBackgroundOpacity(value);
+    const percent = Math.round(bgOpacity * 100);
+    if (settings) {
+      settings.backgroundOpacity = bgOpacity;
+      settings.opacity = clampOpacity(Math.max(0.2, bgOpacity));
+    }
+    document.documentElement.style.setProperty('--cue-bg-opacity', String(bgOpacity));
     const tb = $('#tb-opacity-slider');
     const tbVal = $('#tb-opacity-value');
     const s = $('#s-opacity-slider');
@@ -693,6 +714,154 @@
     if (!el) return;
     el.addEventListener('input', () => applyOpacity(Number(el.value) / 100, true));
     el.addEventListener('change', () => applyOpacity(Number(el.value) / 100, true));
+  });
+  document.querySelectorAll('.opacity-chip, .s-chip').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = Number(btn.getAttribute('data-val')) / 100;
+      applyOpacity(val, true);
+    });
+  });
+  cue.on('opacity:set', (data) => {
+    if (data && data.backgroundOpacity !== undefined) {
+      applyOpacity(data.backgroundOpacity, false);
+    }
+  });
+
+  // ---- Compact Mode ----
+  let isCompact = false;
+  function applyCompactMode(compact) {
+    isCompact = !!compact;
+    if (settings) settings.compactMode = isCompact;
+    document.getElementById('app').classList.toggle('compact-mode', isCompact);
+    const btn = $('#compact-btn');
+    if (btn) {
+      btn.classList.toggle('on', isCompact);
+      const ic = btn.querySelector('.ic');
+      if (ic) ic.innerHTML = icon(isCompact ? 'maximize-2' : 'minimize-2', { size: 14 });
+      btn.title = isCompact ? 'Expand Assistant (Ctrl+Shift+M)' : 'Compact Assistant (Ctrl+Shift+M)';
+    }
+    const sCompact = $('#s-compact-mode');
+    if (sCompact) sCompact.checked = isCompact;
+  }
+  const compactBtn = $('#compact-btn');
+  if (compactBtn) {
+    compactBtn.addEventListener('click', async () => {
+      const res = await cue.compactToggle();
+      applyCompactMode(res);
+    });
+  }
+  cue.on('compact:changed', (data) => {
+    if (data) applyCompactMode(data.compact);
+  });
+
+  // ---- Mouse Click-Through Mode ----
+  let clickThroughActive = false;
+  function applyClickThrough(enabled) {
+    clickThroughActive = !!enabled;
+    if (settings) settings.clickThrough = clickThroughActive;
+    const btn = $('#clickthrough-btn');
+    if (btn) btn.classList.toggle('on', clickThroughActive);
+    const banner = $('#clickthrough-banner');
+    if (banner) banner.classList.toggle('hidden', !clickThroughActive);
+    if (!clickThroughActive) {
+      setIgnore(false);
+    } else {
+      setIgnore(true);
+    }
+  }
+  const ctBtn = $('#clickthrough-btn');
+  if (ctBtn) {
+    ctBtn.addEventListener('click', async () => {
+      const res = await cue.clickThroughToggle();
+      applyClickThrough(res);
+    });
+  }
+  cue.on('click-through:changed', (data) => {
+    if (data) applyClickThrough(data.enabled);
+  });
+
+  // ---- Always-On-Top ----
+  function applyAlwaysOnTop(isTop) {
+    if (settings) settings.alwaysOnTop = isTop;
+    const btn = $('#pin-btn');
+    if (btn) btn.classList.toggle('on', isTop);
+    const sTop = $('#s-always-on-top');
+    if (sTop) sTop.checked = isTop;
+  }
+  const pinBtn = $('#pin-btn');
+  if (pinBtn) {
+    pinBtn.addEventListener('click', async () => {
+      const res = await cue.alwaysOnTopToggle();
+      applyAlwaysOnTop(res);
+    });
+  }
+  cue.on('always-on-top:changed', (data) => {
+    if (data) applyAlwaysOnTop(data.alwaysOnTop);
+  });
+
+  // ---- Overlay Resizing ----
+  const resizeHandle = $('#resize-handle');
+  if (resizeHandle) {
+    let resizing = false;
+    let startX = 0, startY = 0;
+    let startW = 700, startH = 600;
+    let resizeRaf = null;
+    let pendingW = 0, pendingH = 0;
+
+    resizeHandle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      resizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const panelEl = $('#panel');
+      startW = panelEl.offsetWidth || 700;
+      startH = window.innerHeight || 600;
+      resizeHandle.setPointerCapture(e.pointerId);
+      setIgnore(false);
+    });
+
+    resizeHandle.addEventListener('pointermove', (e) => {
+      if (!resizing) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const nextW = Math.max(440, Math.min(1200, Math.round(startW + dx)));
+      const nextH = Math.max(260, Math.min(1100, Math.round(startH + dy)));
+      document.documentElement.style.setProperty('--main-w', nextW + 'px');
+      pendingW = nextW;
+      pendingH = nextH;
+      if (!resizeRaf) {
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = null;
+          cue.windowResize({ width: pendingW, height: pendingH });
+        });
+      }
+    });
+
+    const endResize = (e) => {
+      if (!resizing) return;
+      resizing = false;
+      if (resizeRaf) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+        cue.windowResize({ width: pendingW, height: pendingH });
+      }
+      try { resizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    resizeHandle.addEventListener('pointerup', endResize);
+    resizeHandle.addEventListener('pointercancel', endResize);
+  }
+  cue.on('window:resized', (data) => {
+    if (data && data.panelWidth) {
+      document.documentElement.style.setProperty('--main-w', data.panelWidth + 'px');
+    }
+  });
+
+  // ---- Open Settings from Tray ----
+  cue.on('settings:open', () => {
+    openSettings();
   });
 
   // Stop = start/stop listening. Kick off system-audio capture straight from the click so
@@ -1447,8 +1616,42 @@
       closingSettings = false;
     }
   }
+  function openOpenAISettings() {
+    openSettings();
+    showSettingsTab('keys');
+    selectByoProvider();
+  }
+
+  function updateGptChip(s) {
+    const badge = typeof $ === 'function' ? $('#tb-gpt-badge') : null;
+    if (!badge || !s) return;
+    const prov = s.provider || 'openai';
+    if (prov === 'openai') {
+      const m = (s.models && s.models.openai && (s.smart ? s.models.openai.smart : s.models.openai.fast)) || '4o-mini';
+      badge.textContent = m.replace(/^gpt-/, '');
+    } else if (prov === 'custom') {
+      badge.textContent = 'CUSTOM';
+    } else {
+      badge.textContent = prov.slice(0, 6).toUpperCase();
+    }
+  }
+
   $('#more-btn').addEventListener('click', openSettings);
   $('#tb-settings-btn').addEventListener('click', openSettings);
+  const tbGptBtn = $('#tb-gpt-btn');
+  if (tbGptBtn) tbGptBtn.addEventListener('click', openOpenAISettings);
+  document.querySelectorAll('.model-chip').forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      const fast = chip.getAttribute('data-fast');
+      const smart = chip.getAttribute('data-smart');
+      if (fast && $('#model-fast')) $('#model-fast').value = fast;
+      if (smart && $('#model-smart')) $('#model-smart').value = smart;
+      await saveSettings();
+    });
+  });
+  if (typeof cue !== 'undefined' && cue && typeof cue.on === 'function') {
+    cue.on('settings:open-gpt', () => { openOpenAISettings(); });
+  }
   $('#s-close').addEventListener('click', () => { void closeSettings(); });
   scrim.addEventListener('click', (e) => { if (e.target === scrim) void closeSettings(); });
 
@@ -1828,7 +2031,11 @@
     $('#ai-rules').value = settings.aiRules || '';
     updateAiRulesCounter();
     // Appearance tab
-    applyOpacity(settings.opacity, false);
+    applyOpacity(settings.backgroundOpacity !== undefined ? settings.backgroundOpacity : settings.opacity, false);
+    if ($('#s-always-on-top')) $('#s-always-on-top').checked = settings.alwaysOnTop !== false;
+    if ($('#s-compact-mode')) $('#s-compact-mode').checked = !!settings.compactMode;
+    // Shortcuts tab
+    fillShortcuts();
   }
 
   // Whoever cue has been told it may answer questions for. Empty is the normal
@@ -2055,6 +2262,48 @@
   });
   cue.on('whisper:models-changed', () => refreshWhisperModels());
 
+  const SHORTCUT_ACTIONS = [
+    'assist', 'say', 'leetcode', 'hide', 'compact', 'passthrough', 'emergencyClickThrough', 'screen', 'quit'
+  ];
+
+  function fillShortcuts() {
+    const sc = (settings && settings.shortcuts) || {};
+    SHORTCUT_ACTIONS.forEach((action) => {
+      const el = document.getElementById('sc-' + action);
+      if (el) el.value = sc[action] || '';
+    });
+  }
+
+  function saveShortcutsFromUI() {
+    if (!settings.shortcuts) settings.shortcuts = {};
+    SHORTCUT_ACTIONS.forEach((action) => {
+      const el = document.getElementById('sc-' + action);
+      if (el && el.value.trim()) {
+        settings.shortcuts[action] = el.value.trim();
+      }
+    });
+  }
+
+  const resetScBtn = document.getElementById('sc-reset-defaults');
+  if (resetScBtn) {
+    resetScBtn.addEventListener('click', () => {
+      const defaults = {
+        say: 'CommandOrControl+Return',
+        assist: 'CommandOrControl+Shift+Return',
+        leetcode: 'CommandOrControl+H',
+        quit: 'CommandOrControl+Shift+X',
+        hide: 'Shift+Q',
+        listening: 'CommandOrControl+Shift+L',
+        passthrough: 'CommandOrControl+Shift+I',
+        screen: 'CommandOrControl+Shift+S',
+        compact: 'CommandOrControl+Shift+M',
+        emergencyClickThrough: 'CommandOrControl+Shift+F12'
+      };
+      settings.shortcuts = { ...defaults };
+      fillShortcuts();
+    });
+  }
+
   async function saveSettings() {
     // Keys
     settings.apiKeys.cerebras = $('#key-cerebras').value.trim();
@@ -2108,13 +2357,27 @@
     // Style tab
     settings.aiRules = $('#ai-rules').value.trim();
     // Appearance tab
-    const opacitySlider = $('#s-opacity-slider');
-    if (opacitySlider) settings.opacity = clampOpacity(Number(opacitySlider.value) / 100);
+    const opacitySlider = typeof $ === 'function' ? $('#s-opacity-slider') : null;
+    if (opacitySlider && opacitySlider.value !== undefined) {
+      const val = Number(opacitySlider.value) / 100;
+      settings.backgroundOpacity = val;
+      settings.opacity = clampOpacity(Math.max(0.2, val));
+    }
+    const sAlwaysTop = typeof $ === 'function' ? $('#s-always-on-top') : null;
+    if (sAlwaysTop && sAlwaysTop.checked !== undefined) settings.alwaysOnTop = !!sAlwaysTop.checked;
+    const sCompact = typeof $ === 'function' ? $('#s-compact-mode') : null;
+    if (sCompact && sCompact.checked !== undefined) settings.compactMode = !!sCompact.checked;
+
+    // Shortcuts tab
+    if (typeof saveShortcutsFromUI === 'function') {
+      saveShortcutsFromUI();
+    }
     try {
       settings = await cue.settingsSet(settings);
       keysAtOpen = { ...(settings.apiKeys || {}) };
       $('#s-status').textContent = statusText();
       updateSmartTooltip();
+      if (typeof updateGptChip === 'function') updateGptChip(settings);
       return true;
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
@@ -2422,6 +2685,7 @@
   // ---- boot --------------------------------------------------------------
   (async function boot() {
     settings = await cue.settingsGet();
+    if (typeof updateGptChip === 'function') updateGptChip(settings);
     const platformInfo = await cue.platformInfo();
     publikState = await cue.publikState();
     // A build with no app token never shows the option, and keeps the BYO
@@ -2480,7 +2744,10 @@
       placeholder.innerHTML = 'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist';
     }
 
-    applyOpacity(settings.opacity, false);
+    applyOpacity(settings.backgroundOpacity !== undefined ? settings.backgroundOpacity : settings.opacity, false);
+    if (settings.alwaysOnTop !== undefined) applyAlwaysOnTop(settings.alwaysOnTop !== false);
+    if (settings.compactMode) applyCompactMode(true);
+    if (settings.panelWidth) document.documentElement.style.setProperty('--main-w', settings.panelWidth + 'px');
 
     const st = await cue.captureState();
     $('#live-dot').classList.toggle('off', !st.active);

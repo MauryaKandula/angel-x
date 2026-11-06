@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell, dialog, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell, dialog, systemPreferences, Tray, Menu, nativeImage } = require('electron');
+const { resolveShortcuts } = require('./src/shortcuts');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
@@ -49,17 +50,25 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform,WaylandWindowDecorations');
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 }
+
+// Hardware acceleration & low-latency rendering optimizations
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
 const { WhisperModelManager } = require('./src/whisper-model-manager');
 const { requireWhisperModel } = require('./src/whisper-model-catalog');
 const { locateWhisperRuntime } = require('./src/whisper-runtime');
 const { LocalWhisperTranscriber } = require('./src/local-whisper-transcriber');
 
 let win = null;
+let tray = null;
+let clickThroughMode = false;
+let compactMode = false;
 // Which global shortcuts cue actually holds. `globalShortcut.register` returns
 // false when another application already owns the combination, and nothing used
 // to look at that — so the only symptom was a key that did nothing. Iris reads
 // this and can say which key is taken instead of guessing from a screenshot.
-const shortcutState = { assist: false, say: false, leetcode: false, quit: false };
+const shortcutState = { assist: false, say: false, leetcode: false, quit: false, hide: false, compact: false, passthrough: false, screen: false, emergencyClickThrough: false };
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
@@ -274,14 +283,16 @@ function saveWindowPosition() {
 
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const W = SIDE_W + MAIN_W + SIDE_W, H = 600;
-
   const savedSettings = store.getSettings();
-  let startX = Math.round(workArea.x + (workArea.width - MAIN_W) / 2);
+  const currentPanelW = savedSettings.panelWidth || MAIN_W;
+  const currentH = savedSettings.panelHeight || 600;
+  const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
+
+  let startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
   let startY = workArea.y + 6;
 
   if (savedSettings.windowX !== null && savedSettings.windowY !== null) {
-    const clampedX = Math.max(workArea.x - MAIN_W + 100, Math.min(savedSettings.windowX, workArea.x + workArea.width - 100));
+    const clampedX = Math.max(workArea.x - currentPanelW + 100, Math.min(savedSettings.windowX, workArea.x + workArea.width - 100));
     // Keep the whole window on screen, not just a 40px sliver of it. The old
     // `- 40` let a 600px-tall window sit at y=607 on a 960px display, pushing
     // the composer and action row off the bottom edge with no way to reach them.
@@ -310,7 +321,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false,
+      spellcheck: false
     }
   };
 
@@ -346,7 +359,7 @@ function createWindow() {
     console.log(`[cue] Windows session is not a local console session (SESSIONNAME=${process.env.SESSIONNAME}) — skipping setContentProtection so the window stays visible to you. Window may appear in screen shares.`);
   }
 
-  win.setAlwaysOnTop(true, 'screen-saver', 1);
+  win.setAlwaysOnTop(savedSettings.alwaysOnTop !== false, 'screen-saver', 1);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   if (isMac && typeof win.setHiddenInMissionControl === 'function') win.setHiddenInMissionControl(true);
 
@@ -363,6 +376,17 @@ function createWindow() {
   win.webContents.on('did-finish-load', () => {
     win.showInactive();
     win.setTitle('Microsoft Edge Update');
+    if (savedSettings.compactMode) {
+      compactMode = true;
+      send('compact:changed', { compact: true });
+    }
+    if (savedSettings.backgroundOpacity !== undefined) {
+      send('opacity:set', { backgroundOpacity: savedSettings.backgroundOpacity });
+    }
+    if (savedSettings.panelWidth) {
+      send('window:resized', { panelWidth: savedSettings.panelWidth, height: savedSettings.panelHeight || H });
+    }
+    updateTray();
     if (restoredTurns.length) {
       // A meeting was in progress when cue last exited: put its transcript back
       // in the sidebar so Recap / Follow-up pick up where the conversation was.
@@ -1195,6 +1219,13 @@ ipcMain.handle('settings:set', (_e, patch) => {
   }
   // Restart slide polling with the new interval when capturing (keeps slides).
   if (state.capturing) startSlideLoop();
+  if (patch && patch.shortcuts) {
+    registerShortcuts();
+  }
+  if (patch && 'alwaysOnTop' in patch && win && !win.isDestroyed()) {
+    win.setAlwaysOnTop(patch.alwaysOnTop !== false, 'screen-saver', 1);
+  }
+  updateTray();
   return store.redactForRenderer(next);
 });
 
@@ -1514,7 +1545,264 @@ ipcMain.handle('slides:clear', () => {
 ipcMain.on('ask', (_e, payload) => runFeature(payload.mode, payload.text));
 ipcMain.on('mic:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('you', arrayBuffer); });
 ipcMain.on('system:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('them', arrayBuffer); });
-ipcMain.on('mouse:ignore', (_e, v) => { if (win) win.setIgnoreMouseEvents(!!v, { forward: true }); });
+ipcMain.on('mouse:ignore', (_e, v) => {
+  if (clickThroughMode) return;
+  if (win) win.setIgnoreMouseEvents(!!v, { forward: true });
+});
+
+// -------- Click-through mode --------
+function setClickThrough(enabled) {
+  clickThroughMode = !!enabled;
+  if (win && !win.isDestroyed()) {
+    win.setIgnoreMouseEvents(clickThroughMode, { forward: true });
+  }
+  send('click-through:changed', { enabled: clickThroughMode });
+  updateTray();
+}
+
+function toggleClickThrough() {
+  setClickThrough(!clickThroughMode);
+}
+
+ipcMain.handle('click-through:toggle', () => {
+  toggleClickThrough();
+  return clickThroughMode;
+});
+ipcMain.handle('click-through:set', (_e, v) => {
+  setClickThrough(v);
+  return clickThroughMode;
+});
+
+// -------- Compact mode --------
+function setCompactMode(compact) {
+  compactMode = !!compact;
+  store.setSettings({ compactMode });
+  send('compact:changed', { compact: compactMode });
+  updateTray();
+}
+
+function toggleCompactMode() {
+  setCompactMode(!compactMode);
+}
+
+ipcMain.handle('compact:toggle', () => {
+  toggleCompactMode();
+  return compactMode;
+});
+ipcMain.handle('compact:set', (_e, v) => {
+  setCompactMode(v);
+  return compactMode;
+});
+
+// -------- Always-on-top --------
+function setAlwaysOnTop(v) {
+  if (!win || win.isDestroyed()) return;
+  win.setAlwaysOnTop(v, 'screen-saver', 1);
+  store.setSettings({ alwaysOnTop: v });
+  send('always-on-top:changed', { alwaysOnTop: v });
+  updateTray();
+}
+
+function toggleAlwaysOnTop() {
+  if (!win || win.isDestroyed()) return false;
+  const cur = win.isAlwaysOnTop();
+  setAlwaysOnTop(!cur);
+  return !cur;
+}
+
+ipcMain.handle('always-on-top:toggle', () => toggleAlwaysOnTop());
+ipcMain.handle('always-on-top:set', (_e, v) => { setAlwaysOnTop(v); return v; });
+
+// -------- Window resizing --------
+let resizeSaveTimer = null;
+ipcMain.on('window:resize', (_e, dims) => {
+  if (!win || win.isDestroyed() || !dims) return;
+  const bounds = win.getBounds();
+  const minW = 440;
+  const minH = 260;
+  const newPanelW = Math.max(minW, Math.round(dims.width || MAIN_W));
+  const newH = Math.max(minH, Math.round(dims.height || bounds.height));
+  const newTotalW = SIDE_W + newPanelW + SIDE_W;
+  win.setBounds({ x: bounds.x, y: bounds.y, width: newTotalW, height: newH });
+  if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
+  resizeSaveTimer = setTimeout(() => {
+    store.setSettings({ panelWidth: newPanelW, panelHeight: newH });
+  }, 200);
+});
+
+// -------- User-initiated screen analysis --------
+ipcMain.handle('screen:capture-analyze', () => {
+  runFeature('assist', '');
+  return { ok: true };
+});
+
+// -------- Window visibility toggle --------
+function toggleWindowVisibility() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isVisible()) {
+    win.hide();
+  } else {
+    win.show();
+    win.showInactive();
+  }
+  send('hide:toggle', { visible: win.isVisible() });
+  updateTray();
+}
+
+// -------- Shortcuts reload --------
+ipcMain.handle('shortcuts:reload', () => {
+  registerShortcuts();
+  return shortcutState;
+});
+
+// -------- System Tray --------
+function getTrayIcon() {
+  const iconPath = path.join(__dirname, 'build-resources', 'tray-icon.png');
+  let img = nativeImage.createFromPath(iconPath);
+  if (img.isEmpty()) {
+    const fallbackPath = path.join(__dirname, 'node_modules', 'app-builder-lib', 'templates', 'icons', 'electron-linux', '32x32.png');
+    img = nativeImage.createFromPath(fallbackPath);
+  }
+  return img;
+}
+
+function updateTray() {
+  if (!tray || tray.isDestroyed()) return;
+  const isVisible = win && !win.isDestroyed() && win.isVisible();
+  const isTop = win && !win.isDestroyed() && win.isAlwaysOnTop();
+  const settings = store.getSettings();
+  const currentBgOpacity = Math.round((settings.backgroundOpacity != null ? settings.backgroundOpacity : 0.85) * 100);
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Cue Assistant — Angel AI Desktop Overlay', enabled: false },
+    { type: 'separator' },
+    {
+      label: isVisible ? 'Hide Overlay' : 'Show Overlay',
+      click: () => toggleWindowVisibility()
+    },
+    {
+      label: 'Compact Mode',
+      type: 'checkbox',
+      checked: compactMode,
+      click: () => toggleCompactMode()
+    },
+    {
+      label: 'Mouse Click-Through (Ctrl+Shift+F12 to disable)',
+      type: 'checkbox',
+      checked: clickThroughMode,
+      click: () => toggleClickThrough()
+    },
+    {
+      label: 'Always On Top',
+      type: 'checkbox',
+      checked: isTop,
+      click: () => toggleAlwaysOnTop()
+    },
+    { type: 'separator' },
+    {
+      label: 'Background Opacity',
+      submenu: [
+        {
+          label: '0% — Fully Transparent (Clean Text Overlay)',
+          type: 'radio',
+          checked: currentBgOpacity === 0,
+          click: () => {
+            store.setSettings({ backgroundOpacity: 0 });
+            send('opacity:set', { backgroundOpacity: 0 });
+            updateTray();
+          }
+        },
+        {
+          label: '25% — Ultra Glass',
+          type: 'radio',
+          checked: currentBgOpacity === 25,
+          click: () => {
+            store.setSettings({ backgroundOpacity: 0.25 });
+            send('opacity:set', { backgroundOpacity: 0.25 });
+            updateTray();
+          }
+        },
+        {
+          label: '50% — Frosted Glass',
+          type: 'radio',
+          checked: currentBgOpacity === 50,
+          click: () => {
+            store.setSettings({ backgroundOpacity: 0.5 });
+            send('opacity:set', { backgroundOpacity: 0.5 });
+            updateTray();
+          }
+        },
+        {
+          label: '75% — Medium Tint',
+          type: 'radio',
+          checked: currentBgOpacity === 75,
+          click: () => {
+            store.setSettings({ backgroundOpacity: 0.75 });
+            send('opacity:set', { backgroundOpacity: 0.75 });
+            updateTray();
+          }
+        },
+        {
+          label: '100% — Solid Dark Glass',
+          type: 'radio',
+          checked: currentBgOpacity === 100,
+          click: () => {
+            store.setSettings({ backgroundOpacity: 1 });
+            send('opacity:set', { backgroundOpacity: 1 });
+            updateTray();
+          }
+        }
+      ]
+    },
+    { type: 'separator' },
+    {
+      label: 'Capture Screen & Analyze',
+      click: () => runFeature('assist', '')
+    },
+    {
+      label: '⚡ Configure GPT API Key...',
+      click: () => {
+        if (win && !win.isDestroyed()) {
+          win.show();
+          win.focus();
+          send('settings:open-gpt');
+        }
+      }
+    },
+    {
+      label: 'Settings...',
+      click: () => {
+        if (win && !win.isDestroyed()) {
+          win.show();
+          win.showInactive();
+          send('settings:open', {});
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Cue',
+      click: () => app.quit()
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.setToolTip(`Cue Assistant (${clickThroughMode ? 'Click-Through Active' : 'Interactive'}${compactMode ? ' · Compact' : ''})`);
+}
+
+function createTray() {
+  if (tray) return;
+  try {
+    const icon = getTrayIcon();
+    tray = new Tray(icon);
+    tray.setToolTip('Cue Assistant — Transparent Desktop AI');
+    tray.on('click', () => toggleWindowVisibility());
+    updateTray();
+  } catch (err) {
+    console.error('[cue] failed to create system tray:', err);
+  }
+}
+
 // Window dragging is done here rather than with CSS drag regions, which misbehave while the
 // renderer toggles click-through. The window follows the cursor until the renderer says stop.
 let windowDrag = null;
@@ -1589,11 +1877,23 @@ ipcMain.on('permissions:continue', async () => {
 
 // -------- shortcuts --------
 function registerShortcuts() {
-  shortcutState.say = globalShortcut.register('CommandOrControl+Return', () => runFeature('say', ''));
-  shortcutState.assist = globalShortcut.register('CommandOrControl+Shift+Return', () => runFeature('assist', ''));
-  shortcutState.leetcode = globalShortcut.register('CommandOrControl+H', () => runFeature('leetcode', ''));
-  shortcutState.hide = globalShortcut.register('CommandOrControl+Shift+/', () => send('hide:toggle', {}));
-  shortcutState.quit = globalShortcut.register('CommandOrControl+Shift+X', () => app.quit());
+  globalShortcut.unregisterAll();
+  const currentShortcuts = resolveShortcuts(store.getSettings().shortcuts || {});
+
+  shortcutState.say = currentShortcuts.say ? globalShortcut.register(currentShortcuts.say, () => runFeature('say', '')) : false;
+  shortcutState.assist = currentShortcuts.assist ? globalShortcut.register(currentShortcuts.assist, () => runFeature('assist', '')) : false;
+  shortcutState.leetcode = currentShortcuts.leetcode ? globalShortcut.register(currentShortcuts.leetcode, () => runFeature('leetcode', '')) : false;
+  shortcutState.hide = currentShortcuts.hide ? globalShortcut.register(currentShortcuts.hide, () => toggleWindowVisibility()) : false;
+  shortcutState.quit = currentShortcuts.quit ? globalShortcut.register(currentShortcuts.quit, () => app.quit()) : false;
+  shortcutState.compact = currentShortcuts.compact ? globalShortcut.register(currentShortcuts.compact, () => toggleCompactMode()) : false;
+  shortcutState.passthrough = currentShortcuts.passthrough ? globalShortcut.register(currentShortcuts.passthrough, () => toggleClickThrough()) : false;
+  shortcutState.screen = currentShortcuts.screen ? globalShortcut.register(currentShortcuts.screen, () => runFeature('assist', '')) : false;
+  // Emergency shortcut: ALWAYS disables click-through unconditionally!
+  shortcutState.emergencyClickThrough = currentShortcuts.emergencyClickThrough ? globalShortcut.register(currentShortcuts.emergencyClickThrough, () => {
+    setClickThrough(false);
+    send('status', { message: 'Emergency: Mouse Click-Through disabled.' });
+  }) : false;
+
   for (const [name, wasRegistered] of Object.entries(shortcutState)) {
     if (!wasRegistered) {
       recordEvent({ level: 'warn', event: 'shortcut_unavailable', msg: 'another application holds the ' + name + ' shortcut', frame: 'registerShortcuts', context: { shortcut: name } });
@@ -1787,6 +2087,7 @@ function launchApp() {
   });
 
   createWindow();
+  createTray();
   registerShortcuts();
   startupChecks();
 }
@@ -1834,6 +2135,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('will-quit', () => {
+  if (tray && !tray.isDestroyed()) {
+    try { tray.destroy(); } catch (_) {}
+    tray = null;
+  }
   globalShortcut.unregisterAll();
   // Quitting mid-meeting is a pause, not an end: the meeting stays open on disk
   // so a relaunch within the resume window picks it back up (a stale one is
