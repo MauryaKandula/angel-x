@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('cue', {
   clickThroughSet: (v) => ipcRenderer.invoke('click-through:set', v),
   compactToggle: () => ipcRenderer.invoke('compact:toggle'),
   compactSet: (v) => ipcRenderer.invoke('compact:set', v),
+  panelCollapse: (v) => ipcRenderer.send('panel:collapse', v),
   alwaysOnTopToggle: () => ipcRenderer.invoke('always-on-top:toggle'),
   alwaysOnTopSet: (v) => ipcRenderer.invoke('always-on-top:set', v),
   screenProtectionToggle: () => ipcRenderer.invoke('screen-protection:toggle'),

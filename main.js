@@ -273,7 +273,7 @@ async function getWhisperOverview() {
 // The window has a transparent, click-through strip on each side of the main column so
 // the history sidebar can slide out left or right. Must match --main-w/--side-w in
 // styles.css. Saved windowX is the main column's x, not the window's.
-const MAIN_W = 700, SIDE_W = 300;
+const MAIN_W = 700, SIDE_W = 300, BAR_H = 75;
 
 function saveWindowPosition() {
   if (!win || win.isDestroyed()) return;
@@ -287,6 +287,8 @@ function createWindow() {
   const currentPanelW = savedSettings.panelWidth || MAIN_W;
   const currentH = savedSettings.panelHeight || 600;
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
+  const isStartCollapsed = savedSettings.startCollapsed !== false || savedSettings.compactMode;
+  const initialH = isStartCollapsed ? BAR_H : currentH;
 
   let startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
   let startY = workArea.y + 6;
@@ -303,7 +305,7 @@ function createWindow() {
 
   const winOptions = {
     width: W,
-    height: H,
+    height: initialH,
     x: startX - SIDE_W,
     y: startY,
     enableLargerThanScreen: true,
@@ -313,6 +315,7 @@ function createWindow() {
     frame: false,
     transparent: true,
     hasShadow: false,
+    backgroundColor: '#00000000',
     resizable: true,
     skipTaskbar: false,
     alwaysOnTop: true,
@@ -1559,9 +1562,21 @@ ipcMain.handle('click-through:set', (_e, v) => {
 function setCompactMode(compact) {
   compactMode = !!compact;
   store.setSettings({ compactMode });
+  if (win && !win.isDestroyed()) {
+    const bounds = win.getBounds();
+    const targetH = compactMode ? BAR_H : (store.getSettings().panelHeight || 600);
+    win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: targetH });
+  }
   send('compact:changed', { compact: compactMode });
   updateTray();
 }
+
+ipcMain.on('panel:collapse', (_e, collapsed) => {
+  if (!win || win.isDestroyed()) return;
+  const bounds = win.getBounds();
+  const targetH = collapsed ? BAR_H : (store.getSettings().panelHeight || 600);
+  win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: targetH });
+});
 
 function toggleCompactMode() {
   setCompactMode(!compactMode);

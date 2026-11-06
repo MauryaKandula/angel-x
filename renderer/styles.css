@@ -105,11 +105,11 @@ html, body {
   gap: 4px;
   padding: 5px 8px;
   border-radius: var(--r-pill);
-  background: var(--bg);
+  background: rgba(6, 10, 20, 0.94);
   border: 1px solid rgba(0, 240, 255, 0.40);
   box-shadow: 0 0 16px rgba(0, 240, 255, 0.20), inset 0 1px 0 rgba(0, 240, 255, 0.25);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transform: translateZ(0);
   will-change: transform, opacity;
 }
@@ -324,8 +324,8 @@ button:focus { outline: none; }
 
 .glass {
   background: var(--panel-bg);
-  -webkit-backdrop-filter: blur(8px) saturate(130%);
-  backdrop-filter: blur(8px) saturate(130%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   border: 1px solid rgba(0, 240, 255, calc(0.18 + (1 - var(--cue-bg-opacity, 0.85)) * 0.22));
   border-radius: var(--r-panel);
   box-shadow: 0 12px 40px rgba(0,0,0,calc(0.40 + var(--cue-bg-opacity, 0.85) * 0.35)), 0 0 20px rgba(0, 240, 255, 0.15), inset 0 1px 0 rgba(0, 240, 255, 0.25);
@@ -337,6 +337,7 @@ button:focus { outline: none; }
 [data-cue-opacity="0"] .glass {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  background: transparent !important;
 }
 /* The top padding leaves room for #stt-status (top 14px + line 12px): the first
    line of a scrolled answer never shows under the label (0.2.11 smoke test). */
@@ -955,8 +956,8 @@ button:focus { outline: none; }
   
   /* Glass styling to match main panel */
   background: var(--panel-bg);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   border: 1px solid var(--bd-hair);
   border-radius: var(--r-panel);
   box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);

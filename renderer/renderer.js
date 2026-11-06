@@ -11,6 +11,18 @@
   quitButton.addEventListener('click', () => cue.quit());
   quitButton.title = isMac ? 'Quit cue (⌘⇧X)' : 'Quit cue (Ctrl+Shift+X)';
 
+  // Initial state: start with panel collapsed so only the Angel bar floats
+  const initPw = $('#panel-wrap');
+  if (initPw) initPw.classList.add('collapsed');
+  const initHideBtn = $('#hide-btn');
+  if (initHideBtn) {
+    initHideBtn.classList.add('collapsed');
+    const label = initHideBtn.querySelector('.tb-hide-label');
+    if (label) label.textContent = 'Show';
+    initHideBtn.title = 'Show';
+    initHideBtn.setAttribute('aria-label', 'Show');
+  }
+
   // ---- paint icons -------------------------------------------------------
   $('#logo-btn').innerHTML = icon('badge-question-mark', { size: 16 });
   $('#tb-settings-btn').innerHTML = icon('settings', { size: 16 });
@@ -645,6 +657,9 @@
       if (label) label.textContent = text;
       btn.title = text;
       btn.setAttribute('aria-label', text);
+    }
+    if (typeof cue.panelCollapse === 'function') {
+      cue.panelCollapse(shouldCollapse);
     }
     if (shouldCollapse) {
       reopenSidebarOnExpand = sidebarOpen;
