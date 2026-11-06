@@ -86,6 +86,10 @@ html, body {
   pointer-events: none;                  /* only the actual UI blocks; gaps pass through */
   opacity: var(--cue-opacity, 1);
 }
+#app.collapsed {
+  margin-left: 0 !important;
+  width: 100% !important;
+}
 #settings-scrim, #onboard-scrim, #consent-scrim {
   opacity: var(--cue-opacity, 1);
 }
@@ -195,11 +199,12 @@ html, body {
   position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 60;
   display: flex; flex-direction: column; align-items: stretch; gap: 6px;
   padding: 8px 12px; min-width: 220px;
-  background: var(--bg);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(6, 10, 20, 0.96);
+  border: 1px solid rgba(0, 240, 255, 0.35);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-  backdrop-filter: blur(24px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.75), 0 0 16px rgba(0, 240, 255, 0.20);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .opacity-popover.hidden { display: none; }
 .opacity-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); }
@@ -231,7 +236,7 @@ html, body {
 .clickthrough-banner {
   margin: 6px 0 2px;
   padding: 6px 14px;
-  background: rgba(0, 240, 255, 0.18);
+  background: rgba(6, 10, 20, 0.95);
   border: 1px solid rgba(0, 240, 255, 0.65);
   border-radius: var(--r-pill);
   color: #f0fdff;
@@ -240,7 +245,8 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  backdrop-filter: blur(16px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
   animation: fadeUp 200ms ease;
   pointer-events: none;
@@ -676,7 +682,9 @@ button:focus { outline: none; }
 #settings-scrim {
   position: fixed; inset: 0; z-index: 20;
   display: grid; place-items: center;
-  background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+  background: rgba(4, 7, 15, 0.88);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 #settings-scrim.hidden { display: none; }
 #settings { width: min(500px, 94vw); padding: 18px 20px 20px; max-height: 88vh; display: flex; flex-direction: column; background: rgba(6, 10, 20, 0.94); border: 1px solid rgba(0, 240, 255, 0.45); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.20); }
@@ -884,7 +892,7 @@ button:focus { outline: none; }
 
 
 /* ============================ Onboarding / tutorial ============================ */
-#onboard-scrim { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0,0,0,0.45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#onboard-scrim { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(4, 7, 15, 0.88); -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 #onboard-scrim.hidden { display: none; }
 #onboard { width: min(470px, 93vw); padding: 22px 28px 16px; text-align: center; animation: overlayIn 240ms cubic-bezier(0.22,1,0.36,1);
   /* The window is 600 px tall: the dialog never grows past it; the text scrolls instead of the buttons being cut off. */
@@ -1170,7 +1178,7 @@ button:focus { outline: none; }
 /* Anything full-screen added here must ALSO be listed in the pointer-events
    rule near the top and in the click-through selector in renderer.js, or the
    window stays transparent to the mouse and the buttons cannot be clicked. */
-#consent-scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#consent-scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4, 7, 15, 0.88); -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 /* Keep full-window overlays over the main column, not the sidebar strips. Declared after
    each overlay's `inset: 0` so it wins. */
 #settings-scrim, #onboard-scrim, #consent-scrim { left: var(--side-w); right: auto; width: var(--main-w); }

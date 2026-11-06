@@ -274,11 +274,13 @@ async function getWhisperOverview() {
 // the history sidebar can slide out left or right. Must match --main-w/--side-w in
 // styles.css. Saved windowX is the main column's x, not the window's.
 const MAIN_W = 700, SIDE_W = 300, BAR_H = 75;
+let isPanelCollapsed = true;
 
 function saveWindowPosition() {
   if (!win || win.isDestroyed()) return;
   const [x, y] = win.getPosition();
-  store.setSettings({ windowX: x + SIDE_W, windowY: y });
+  const savedX = isPanelCollapsed ? x : (x + SIDE_W);
+  store.setSettings({ windowX: savedX, windowY: y });
 }
 
 function createWindow() {
@@ -288,7 +290,9 @@ function createWindow() {
   const currentH = savedSettings.panelHeight || 600;
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const isStartCollapsed = savedSettings.startCollapsed !== false || savedSettings.compactMode;
+  isPanelCollapsed = isStartCollapsed;
   const initialH = isStartCollapsed ? BAR_H : currentH;
+  const initialW = isStartCollapsed ? currentPanelW : W;
 
   let startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
   let startY = workArea.y + 6;
@@ -303,10 +307,12 @@ function createWindow() {
     startY = clampedY;
   }
 
+  const initialX = isStartCollapsed ? startX : (startX - SIDE_W);
+
   const winOptions = {
-    width: W,
+    width: initialW,
     height: initialH,
-    x: startX - SIDE_W,
+    x: initialX,
     y: startY,
     enableLargerThanScreen: true,
     // The window is shown inactive and never takes focus, so without this macOS spends the
@@ -315,7 +321,6 @@ function createWindow() {
     frame: false,
     transparent: true,
     hasShadow: false,
-    backgroundColor: '#00000000',
     resizable: true,
     skipTaskbar: false,
     alwaysOnTop: true,
@@ -1564,8 +1569,18 @@ function setCompactMode(compact) {
   store.setSettings({ compactMode });
   if (win && !win.isDestroyed()) {
     const bounds = win.getBounds();
-    const targetH = compactMode ? BAR_H : (store.getSettings().panelHeight || 600);
-    win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: targetH });
+    const currentPanelW = store.getSettings().panelWidth || MAIN_W;
+    const currentH = store.getSettings().panelHeight || 600;
+    const W = SIDE_W + currentPanelW + SIDE_W;
+    if (compactMode) {
+      const newX = isPanelCollapsed ? bounds.x : (bounds.x + SIDE_W);
+      isPanelCollapsed = true;
+      win.setBounds({ x: newX, y: bounds.y, width: currentPanelW, height: BAR_H });
+    } else {
+      const newX = isPanelCollapsed ? (bounds.x - SIDE_W) : bounds.x;
+      isPanelCollapsed = false;
+      win.setBounds({ x: newX, y: bounds.y, width: W, height: currentH });
+    }
   }
   send('compact:changed', { compact: compactMode });
   updateTray();
@@ -1573,9 +1588,20 @@ function setCompactMode(compact) {
 
 ipcMain.on('panel:collapse', (_e, collapsed) => {
   if (!win || win.isDestroyed()) return;
+  const wasCollapsed = isPanelCollapsed;
+  isPanelCollapsed = !!collapsed;
   const bounds = win.getBounds();
-  const targetH = collapsed ? BAR_H : (store.getSettings().panelHeight || 600);
-  win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: targetH });
+  const currentPanelW = store.getSettings().panelWidth || MAIN_W;
+  const currentH = store.getSettings().panelHeight || 600;
+  const W = SIDE_W + currentPanelW + SIDE_W;
+
+  if (isPanelCollapsed) {
+    const newX = wasCollapsed ? bounds.x : (bounds.x + SIDE_W);
+    win.setBounds({ x: newX, y: bounds.y, width: currentPanelW, height: BAR_H });
+  } else {
+    const newX = wasCollapsed ? (bounds.x - SIDE_W) : bounds.x;
+    win.setBounds({ x: newX, y: bounds.y, width: W, height: currentH });
+  }
 });
 
 function toggleCompactMode() {

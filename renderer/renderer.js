@@ -12,6 +12,8 @@
   quitButton.title = isMac ? 'Quit cue (⌘⇧X)' : 'Quit cue (Ctrl+Shift+X)';
 
   // Initial state: start with panel collapsed so only the Angel bar floats
+  const appEl = $('#app');
+  if (appEl) appEl.classList.add('collapsed');
   const initPw = $('#panel-wrap');
   if (initPw) initPw.classList.add('collapsed');
   const initHideBtn = $('#hide-btn');
@@ -649,6 +651,8 @@
     if (!pw) return;
     const shouldCollapse = force !== undefined ? !!force : !pw.classList.contains('collapsed');
     pw.classList.toggle('collapsed', shouldCollapse);
+    const appContainer = $('#app');
+    if (appContainer) appContainer.classList.toggle('collapsed', shouldCollapse);
     const btn = $('#hide-btn');
     if (btn) {
       btn.classList.toggle('collapsed', shouldCollapse);
