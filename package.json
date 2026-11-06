@@ -1,10 +1,15 @@
 {
-  "name": "cue",
+  "name": "angel-ai",
   "productName": "Angel",
-  "version": "0.2.14",
-  "description": "Angel — Open-source Cyberpunk transparent desktop AI assistant inspired by Angel AI.",
+  "version": "1.0.0",
+  "description": "Angel AI — High-Performance Cyberpunk Transparent Desktop AI Overlay for Windows with Universal GPT & Local Whisper STT",
   "license": "GPL-3.0-or-later",
-  "author": "Angel",
+  "author": "Kandula Paul Saketh Maurya <mauryakpsofficial@gmail.com>",
+  "homepage": "https://github.com/MauryaKandula/angel-ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MauryaKandula/angel-ai.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
