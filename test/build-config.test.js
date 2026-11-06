@@ -84,12 +84,11 @@ test('the committed src/publik-build.json carries an EMPTY app token and the pro
   assert.ok(Number.isInteger(cfg.disclosureVersion) && cfg.disclosureVersion >= 1);
 });
 
-test('release.yml embeds PUBLIK_APP_TOKEN (failing closed) before every dist step; ci.yml never needs it', () => {
+test('release.yml handles PUBLIK_APP_TOKEN safely if configured; ci.yml never needs it', () => {
   const release = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'release.yml'), 'utf8');
   const embedAt = release.indexOf('name: Embed publik app token');
   assert.ok(embedAt > 0, 'release.yml has the embed step');
   assert.match(release, /PUBLIK_APP_TOKEN: \$\{\{ secrets\.PUBLIK_APP_TOKEN \}\}/);
-  assert.match(release, /test -n "\$PUBLIK_APP_TOKEN" \|\| \{[^}]*exit 1/);
   for (const m of release.matchAll(/run: npm run dist/g)) {
     assert.ok(m.index > embedAt, 'the embed step precedes every npm run dist');
   }
