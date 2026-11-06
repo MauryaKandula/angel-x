@@ -317,6 +317,7 @@ function createWindow() {
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
+    title: 'Angel',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1781,13 +1782,13 @@ function updateTray() {
     },
     { type: 'separator' },
     {
-      label: 'Quit Cue',
+      label: 'Quit Angel',
       click: () => app.quit()
     }
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(`Cue Assistant (${clickThroughMode ? 'Click-Through Active' : 'Interactive'}${compactMode ? ' · Compact' : ''})`);
+  tray.setToolTip(`Angel Assistant (${clickThroughMode ? 'Click-Through Active' : 'Interactive'}${compactMode ? ' · Compact' : ''})`);
 }
 
 function createTray() {
@@ -1795,7 +1796,7 @@ function createTray() {
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
-    tray.setToolTip('Cue Assistant — Transparent Desktop AI');
+    tray.setToolTip('Angel Assistant — Transparent Cyberpunk Desktop AI');
     tray.on('click', () => toggleWindowVisibility());
     updateTray();
   } catch (err) {
@@ -1982,6 +1983,7 @@ function createPermissionsWindow() {
     resizable: false,
     skipTaskbar: false,
     fullscreenable: false,
+    title: 'Angel',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -1,9 +1,10 @@
 {
   "name": "cue",
+  "productName": "Angel",
   "version": "0.2.14",
-  "description": "Open-source cross-platform invisible AI overlay — three separate inputs (screen, mic, system audio) into an LLM. A Cluely-style copilot for meetings and coding problems.",
+  "description": "Angel — Open-source Cyberpunk transparent desktop AI assistant inspired by Angel AI.",
   "license": "GPL-3.0-or-later",
-  "author": "cue",
+  "author": "Angel",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
