@@ -96,13 +96,15 @@ Angel X responds to system-wide global shortcuts, allowing instantaneous interac
 
 | Shortcut | Action | Description |
 |---|---|---|
-| `Ctrl + Shift + Enter` | **Smart Assist** | Takes a screenshot + reviews recent conversation to suggest next actions |
-| `Ctrl + Enter` | **What should I say?** | Analyzes what the speaker just said and suggests the best response |
-| `Ctrl + H` | **Solve Problem** | Captures active screen region and generates a code solution |
-| `Ctrl + Shift + M` | **Compact Mode** | Toggles the HUD between ultra-minimal bar and expanded view |
-| `Ctrl + Shift + I` | **Click-Through** | Enables mouse click-through mode |
-| `Ctrl + Shift + F12` | **Emergency Escape** | Immediately restores mouse interaction from click-through mode |
-| `Ctrl + Shift + X` | **Quit Angel X** | Instantly closes the Angel X overlay |
+| `Ctrl + Shift + Enter` | **Smart Assist** | Captures active screen + recent conversation context to provide instant solutions |
+| `Ctrl + Enter` | **Suggest Next Reply** | Analyzes what the speaker just said and suggests the best response |
+| `Ctrl + H` | **Solve Problem** | Captures screen code/questions and generates complete solution |
+| `Shift + Q` | **Show / Hide HUD** | Toggles HUD overlay visibility on/off screen |
+| `Ctrl + Shift + M` | **Compact Capsule** | Toggles HUD between 75px floating pill and expanded panel |
+| `Ctrl + Shift + I` | **Click-Through Mode** | Passes all mouse clicks through the HUD to apps underneath |
+| `Ctrl + Shift + F12` | **Restore Mouse Clicks** | Emergency exit from click-through mode |
+| `Ctrl + Shift + S` | **Screen Vision** | Captures screen and sends directly to multimodal AI |
+| `Ctrl + Shift + X` | **Quit Angel X** | Cleanly exits and shuts down the application |
 
 ---
 
