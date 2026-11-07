@@ -43,7 +43,7 @@ test('giving up closes the provider connection: the server stops streaming at on
       signal: controller.signal
     });
     answer.catch(() => {});
-    await sleep(400);
+    for (let i = 0; i < 40 && thinkingSeen === 0; i++) await sleep(25);
     assert.ok(thinkingSeen > 0, 'cue saw the thinking stream');
     const gaveUpAt = Date.now() - t0;
     controller.abort(new Error('gave up'));            // what the watchdog / caption timer do

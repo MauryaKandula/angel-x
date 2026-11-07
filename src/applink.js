@@ -173,6 +173,10 @@ function startAppLink(deps) {
     },
   });
 
+  link.on('error', (error) => {
+    console.log('[cue] app link error:', error && error.message);
+  });
+
   link.start().catch((error) => {
     // A link that will not start must never stop cue from starting. The app
     // worked without this yesterday.

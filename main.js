@@ -2184,47 +2184,65 @@ function launchApp() {
   startupChecks();
 }
 
-// -------- lifecycle --------
-app.whenReady().then(async () => {
-  app.setName('Angel X');
-  if (isWindows) {
-    process.title = 'Angel X';
-  }
+// -------- lifecycle & single-instance lock --------
+const gotTheLock = app.requestSingleInstanceLock();
 
-  // publik usage telemetry v1: app_opened now, active_session every 30 minutes.
-  // Counts only (slug, version, OS, CPU type, a random install ID); no content.
-  // It runs in the background and never delays the window. DO_NOT_TRACK=1 turns
-  // it off. The key is the publik key cue holds, or nothing when there is none.
-  telemetry.start('cue', app.getVersion(), () => {
-    const s = store.getSettings();
-    return s.apiKeys.publik && !s.publik.revoked ? s.apiKeys.publik : null;
+if (!gotTheLock) {
+  console.log('[Angel X] Another instance is already running. Focusing primary instance and quitting.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      if (!win.isVisible()) win.show();
+      win.focus();
+      if (typeof win.moveTop === 'function') {
+        win.moveTop();
+      }
+    }
   });
 
-  if (isMac) {
-    const allGranted = await requestPermissions();
-    if (!allGranted) {
-      // Show the permissions gate — the dock stays visible so the user can find the app
-      createPermissionsWindow();
-      app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow(); });
-      return;
+  app.whenReady().then(async () => {
+    app.setName('Angel X');
+    if (isWindows) {
+      process.title = 'Angel X';
     }
-  } else if (isWindows) {
-    // Windows has no OS-level modal permission dialog to block startup on —
-    // there is no askForMediaAccess() equivalent, and the only way to change
-    // the mic toggle is to leave the app and use Settings — so unlike macOS
-    // this never withholds the main window. It surfaces the same in-app
-    // gate as an informational window alongside the app instead of leaving
-    // the user with no option at all to see or act on the permission state
-    // ("not able to give permission ... coz there is no option").
-    const allGranted = await requestPermissions();
-    if (!allGranted) {
-      createPermissionsWindow();
-    }
-  }
 
-  launchApp();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-});
+    // publik usage telemetry v1: app_opened now, active_session every 30 minutes.
+    // Counts only (slug, version, OS, CPU type, a random install ID); no content.
+    // It runs in the background and never delays the window. DO_NOT_TRACK=1 turns
+    // it off. The key is the publik key cue holds, or nothing when there is none.
+    telemetry.start('cue', app.getVersion(), () => {
+      const s = store.getSettings();
+      return s.apiKeys.publik && !s.publik.revoked ? s.apiKeys.publik : null;
+    });
+
+    if (isMac) {
+      const allGranted = await requestPermissions();
+      if (!allGranted) {
+        // Show the permissions gate — the dock stays visible so the user can find the app
+        createPermissionsWindow();
+        app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow(); });
+        return;
+      }
+    } else if (isWindows) {
+      // Windows has no OS-level modal permission dialog to block startup on —
+      // there is no askForMediaAccess() equivalent, and the only way to change
+      // the mic toggle is to leave the app and use Settings — so unlike macOS
+      // this never withholds the main window. It surfaces the same in-app
+      // gate as an informational window alongside the app instead of leaving
+      // the user with no option at all to see or act on the permission state
+      // ("not able to give permission ... coz there is no option").
+      const allGranted = await requestPermissions();
+      if (!allGranted) {
+        createPermissionsWindow();
+      }
+    }
+
+    launchApp();
+    app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  });
+}
 
 app.on('will-quit', () => {
   if (tray && !tray.isDestroyed()) {
