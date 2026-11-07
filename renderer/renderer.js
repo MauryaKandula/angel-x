@@ -2323,11 +2323,53 @@
     'assist', 'say', 'leetcode', 'hide', 'compact', 'passthrough', 'emergencyClickThrough', 'screen', 'quit'
   ];
 
+  function formatAcceleratorForDisplay(accel) {
+    if (!accel) return '';
+    return accel
+      .replace(/CommandOrControl|CmdOrCtrl/gi, isWindows ? 'Ctrl' : 'Cmd')
+      .replace(/Return/gi, 'Enter')
+      .replace(/\+/g, ' + ');
+  }
+
+  function parseAcceleratorFromDisplay(str) {
+    if (!str) return '';
+    return str
+      .replace(/\s*\+\s*/g, '+')
+      .replace(/\bCtrl\b/gi, 'CommandOrControl')
+      .replace(/\bCmd\b/gi, 'CommandOrControl')
+      .replace(/\bEnter\b/gi, 'Return')
+      .trim();
+  }
+
   function fillShortcuts() {
     const sc = (settings && settings.shortcuts) || {};
     SHORTCUT_ACTIONS.forEach((action) => {
       const el = document.getElementById('sc-' + action);
-      if (el) el.value = sc[action] || '';
+      if (el) {
+        el.value = formatAcceleratorForDisplay(sc[action] || '');
+        if (!el.dataset.recorderAttached) {
+          el.dataset.recorderAttached = 'true';
+          el.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') return;
+            if (e.key === 'Escape') {
+              el.blur();
+              return;
+            }
+            if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+            e.preventDefault();
+            const parts = [];
+            if (e.ctrlKey || e.metaKey) parts.push(isWindows ? 'Ctrl' : 'Cmd');
+            if (e.altKey) parts.push('Alt');
+            if (e.shiftKey) parts.push('Shift');
+            let key = e.key;
+            if (key === 'Enter') key = 'Enter';
+            else if (key === ' ') key = 'Space';
+            else if (key.length === 1) key = key.toUpperCase();
+            parts.push(key);
+            el.value = parts.join(' + ');
+          });
+        }
+      }
     });
   }
 
@@ -2336,7 +2378,7 @@
     SHORTCUT_ACTIONS.forEach((action) => {
       const el = document.getElementById('sc-' + action);
       if (el && el.value.trim()) {
-        settings.shortcuts[action] = el.value.trim();
+        settings.shortcuts[action] = parseAcceleratorFromDisplay(el.value.trim());
       }
     });
   }
