@@ -2208,6 +2208,8 @@ if (!gotTheLock) {
       if (typeof win.moveTop === 'function') {
         win.moveTop();
       }
+      centerWindow();
+      send('panel:expand');
     }
   });
 

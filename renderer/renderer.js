@@ -696,6 +696,7 @@
   }
   $('#hide-btn').addEventListener('click', () => toggleHide());
   cue.on('hide:toggle', () => toggleHide());
+  cue.on('panel:expand', () => expandPanel());
 
   const OPACITY_MIN = 0.2;
   function clampOpacity(value) {
