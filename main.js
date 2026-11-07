@@ -68,7 +68,7 @@ let compactMode = false;
 // false when another application already owns the combination, and nothing used
 // to look at that — so the only symptom was a key that did nothing. Iris reads
 // this and can say which key is taken instead of guessing from a screenshot.
-const shortcutState = { assist: false, say: false, leetcode: false, quit: false, hide: false, compact: false, passthrough: false, screen: false, emergencyClickThrough: false };
+const shortcutState = { assist: false, say: false, leetcode: false, listening: false, quit: false, hide: false, compact: false, passthrough: false, screen: false, emergencyClickThrough: false };
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
@@ -1460,7 +1460,7 @@ ipcMain.on('publik:open', (_e, url) => {
   if (!target) { recordEvent({ level: 'warn', event: 'publik_open_dropped', msg: '', frame: 'publik:open', context: {} }); return; }
   shell.openExternal(target).catch(() => {});
 });
-ipcMain.handle('capture:toggle', () => {
+function toggleCapture() {
   const targetState = !desiredCaptureState;
   desiredCaptureState = targetState;
   if (!targetState && !state.capturing && localWhisperTranscriber) {
@@ -1470,7 +1470,8 @@ ipcMain.handle('capture:toggle', () => {
     .catch(() => state.capturing)
     .then(() => setCapturing(targetState));
   return captureTransition;
-});
+}
+ipcMain.handle('capture:toggle', () => toggleCapture());
 ipcMain.handle('capture:state', () => ({ active: state.capturing }));
 ipcMain.handle('whisper:models', () => getWhisperOverview());
 ipcMain.handle('whisper:model-download', async (_event, modelId) => {
@@ -1590,16 +1591,17 @@ ipcMain.on('panel:collapse', (_e, collapsed) => {
   if (!win || win.isDestroyed()) return;
   const wasCollapsed = isPanelCollapsed;
   isPanelCollapsed = !!collapsed;
+  if (wasCollapsed === isPanelCollapsed) return;
   const bounds = win.getBounds();
   const currentPanelW = store.getSettings().panelWidth || MAIN_W;
   const currentH = store.getSettings().panelHeight || 600;
   const W = SIDE_W + currentPanelW + SIDE_W;
 
   if (isPanelCollapsed) {
-    const newX = wasCollapsed ? bounds.x : (bounds.x + SIDE_W);
+    const newX = bounds.x + SIDE_W;
     win.setBounds({ x: newX, y: bounds.y, width: currentPanelW, height: BAR_H });
   } else {
-    const newX = wasCollapsed ? (bounds.x - SIDE_W) : bounds.x;
+    const newX = bounds.x - SIDE_W;
     win.setBounds({ x: newX, y: bounds.y, width: W, height: currentH });
   }
 });
@@ -1659,7 +1661,12 @@ ipcMain.on('window:resize', (_e, dims) => {
   const newPanelW = Math.max(minW, Math.round(dims.width || MAIN_W));
   const newH = Math.max(minH, Math.round(dims.height || bounds.height));
   const newTotalW = SIDE_W + newPanelW + SIDE_W;
-  win.setBounds({ x: bounds.x, y: bounds.y, width: newTotalW, height: newH });
+  let newX = bounds.x;
+  if (isPanelCollapsed) {
+    newX = bounds.x - SIDE_W;
+    isPanelCollapsed = false;
+  }
+  win.setBounds({ x: newX, y: bounds.y, width: newTotalW, height: newH });
   if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
   resizeSaveTimer = setTimeout(() => {
     store.setSettings({ panelWidth: newPanelW, panelHeight: newH });
@@ -1697,7 +1704,11 @@ function centerWindow() {
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
   const startY = workArea.y + 6;
-  win.setBounds({ x: startX - SIDE_W, y: startY, width: W, height: H });
+  if (isPanelCollapsed) {
+    win.setBounds({ x: startX, y: startY, width: currentPanelW, height: BAR_H });
+  } else {
+    win.setBounds({ x: startX - SIDE_W, y: startY, width: W, height: H });
+  }
   win.show();
   win.focus();
   win.moveTop();
@@ -1750,6 +1761,14 @@ function updateTray() {
       type: 'checkbox',
       checked: clickThroughMode,
       click: () => toggleClickThrough()
+    },
+    {
+      label: 'Emergency: Force Disable Click-Through',
+      enabled: clickThroughMode,
+      click: () => {
+        setClickThrough(false);
+        send('status', { message: 'Emergency: Mouse Click-Through disabled.' });
+      }
     },
     {
       label: 'Always On Top',
@@ -1954,6 +1973,7 @@ function registerShortcuts() {
   shortcutState.say = currentShortcuts.say ? globalShortcut.register(currentShortcuts.say, () => runFeature('say', '')) : false;
   shortcutState.assist = currentShortcuts.assist ? globalShortcut.register(currentShortcuts.assist, () => runFeature('assist', '')) : false;
   shortcutState.leetcode = currentShortcuts.leetcode ? globalShortcut.register(currentShortcuts.leetcode, () => runFeature('leetcode', '')) : false;
+  shortcutState.listening = currentShortcuts.listening ? globalShortcut.register(currentShortcuts.listening, () => toggleCapture()) : false;
   shortcutState.hide = currentShortcuts.hide ? globalShortcut.register(currentShortcuts.hide, () => toggleWindowVisibility()) : false;
   shortcutState.quit = currentShortcuts.quit ? globalShortcut.register(currentShortcuts.quit, () => app.quit()) : false;
   shortcutState.compact = currentShortcuts.compact ? globalShortcut.register(currentShortcuts.compact, () => toggleCompactMode()) : false;

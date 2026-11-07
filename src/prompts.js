@@ -36,7 +36,7 @@ const MODES = {
     resumeMode: 'assist',
     buildSystem(contextBlock, aiRules) {
       return applyRules(buildSystem(
-        'You are cue, a discreet real-time copilot overlaid on the user\'s screen during an interview or coding session. ' +
+        'You are Angel X, a discreet real-time copilot overlaid on the user\'s screen during an interview or coding session. ' +
         BASE_RULES +
         'Look at the screenshot and the recent conversation, decide what the user needs RIGHT NOW, and deliver it directly with no preamble.\n\n' +
         'Detect the question type and respond accordingly:\n' +
@@ -65,7 +65,7 @@ const MODES = {
     resumeMode: 'say',
     buildSystem(contextBlock, aiRules) {
       return applyRules(buildSystem(
-        'You are cue, whispering the perfect reply to the candidate during a live interview. ' +
+        'You are Angel X, whispering the perfect reply to the candidate during a live interview. ' +
         BASE_RULES +
         '"Them" is the interviewer; "You" is the candidate.\n\n' +
         'Draft ONE natural, confident reply the candidate can say out loud, in first person.\n\n' +
@@ -96,7 +96,7 @@ const MODES = {
     transcriptRequired: true,
     buildSystem(contextBlock, aiRules) {
       return applyRules(buildSystem(
-        'You are cue. Recap this conversation so far, using only what is in the transcript:\n' +
+        'You are Angel X. Recap this conversation so far, using only what is in the transcript:\n' +
         '• Topics covered — the actual subjects discussed, with the specifics (names, numbers, decisions) mentioned\n' +
         '• Questions asked — by either side, as they were phrased\n' +
         '• Key points made — what each side said or committed to\n' +
@@ -121,7 +121,7 @@ const MODES = {
     resumeMode: 'ask',
     buildSystem(contextBlock, aiRules) {
       return applyRules(buildSystem(
-        'You are cue, a real-time copilot with access to the candidate\'s screen and live interview. ' +
+        'You are Angel X, a real-time copilot with access to the candidate\'s screen and live interview. ' +
         BASE_RULES +
         'Answer the question directly and concisely. ' +
         'When the question is about the candidate\'s background, use their actual experience. ' +
@@ -143,7 +143,7 @@ const MODES = {
     resumeMode: 'say',  // same context budget as 'say'
     buildSystem(contextBlock, aiRules) {
       return applyRules(buildSystem(
-        'You are cue, whispering a direct answer to the candidate for ONE specific question. ' +
+        'You are Angel X, whispering a direct answer to the candidate for ONE specific question. ' +
         BASE_RULES +
         'The interviewer\'s exact question is provided below. Focus ONLY on answering that question — ignore any other conversation context.\n\n' +
         'Rules:\n' +

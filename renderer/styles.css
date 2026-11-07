@@ -1182,6 +1182,12 @@ button:focus { outline: none; }
 /* Keep full-window overlays over the main column, not the sidebar strips. Declared after
    each overlay's `inset: 0` so it wins. */
 #settings-scrim, #onboard-scrim, #consent-scrim { left: var(--side-w); right: auto; width: var(--main-w); }
+#app.collapsed ~ #settings-scrim,
+#app.collapsed ~ #onboard-scrim,
+#app.collapsed ~ #consent-scrim {
+  left: 0 !important;
+  width: 100% !important;
+}
 #consent-scrim.hidden { display: none; }
 #consent { width: min(430px, 92vw); padding: 24px 26px 16px; text-align: center; animation: overlayIn 240ms cubic-bezier(0.22,1,0.36,1); }
 .cs-title { font-size: 15px; font-weight: 620; color: var(--tx-1); line-height: 1.35; }

@@ -9,7 +9,7 @@
   // Exiting must work before settings or provider setup has completed.
   const quitButton = $('#quit-btn');
   quitButton.addEventListener('click', () => cue.quit());
-  quitButton.title = isMac ? 'Quit cue (⌘⇧X)' : 'Quit cue (Ctrl+Shift+X)';
+  quitButton.title = isMac ? 'Quit Angel X (⌘⇧X)' : 'Quit Angel X (Ctrl+Shift+X)';
 
   // Initial state: start with panel collapsed so only the Angel bar floats
   const appEl = $('#app');
@@ -265,6 +265,7 @@
   // ---- actions -----------------------------------------------------------
   function runMode(mode, text) {
     if (busy) return;
+    expandPanel();
     setBusy(true);
     cue.ask({ mode, text: text || '' });
   }
@@ -672,6 +673,21 @@
       showSidebar();
     }
   }
+  let returnToCollapsedOnModalClose = false;
+  function ensureExpandedForModal() {
+    const pw = $('#panel-wrap');
+    if (pw && pw.classList.contains('collapsed')) {
+      returnToCollapsedOnModalClose = true;
+      toggleHide(false);
+    }
+  }
+  function restoreCollapsedAfterModal() {
+    if (returnToCollapsedOnModalClose) {
+      returnToCollapsedOnModalClose = false;
+      toggleHide(true);
+    }
+  }
+
   function expandPanel() {
     const pw = $('#panel-wrap');
     if (pw && pw.classList.contains('collapsed')) {
@@ -1420,6 +1436,7 @@
     showToast(`Slide ${count} captured · ${title}`, 3000);
   });
   cue.on('llm:start', ({ userBubble, small, category }) => {
+    if (typeof expandPanel === 'function') expandPanel();
     responseCount++;
     if (responseCount > MAX_RESPONSES) {
       const oldest = messages.querySelector('.response-group');
@@ -1621,6 +1638,7 @@
   // Settings always opens on the first tab (publik), with the own-key section
   // closed unless this build has no publik at all.
   function openSettings() {
+    ensureExpandedForModal();
     fillSettings();
     showSettingsTab('keys');
     const byo = $('#byo-section');
@@ -1642,6 +1660,7 @@
     closingSettings = true;
     try {
       if (await saveSettings()) scrim.classList.add('hidden');
+      if (scrim.classList.contains('hidden')) restoreCollapsedAfterModal();
       // A save can change what answers, so the first-run prompt follows it.
       renderSetupCta();
     } finally {
@@ -2490,9 +2509,11 @@
     cue.appLinkConsentRespond(pendingConsentId, allowed);
     pendingConsentId = null;
     consentScrim.classList.add('hidden');
+    restoreCollapsedAfterModal();
   }
 
   cue.on('applink:consent-request', (request) => {
+    ensureExpandedForModal();
     pendingConsentId = request.id;
     $('#cs-title').textContent = request.message;
     $('#cs-body').textContent = request.detail;
@@ -2703,10 +2724,19 @@
     $('#ob-next').classList.toggle('quiet', !!step.publik && !noButtons);
     $('#ob-skip').style.visibility = obIndex === OB_STEPS.length - 1 ? 'hidden' : 'visible';
   }
-  function showOnboard() { obDialog = false; $('#onboard').classList.remove('dialog'); obIndex = 0; renderOnboard(); obScrim.classList.remove('hidden'); setIgnore(false); }
+  function showOnboard() {
+    ensureExpandedForModal();
+    obDialog = false;
+    $('#onboard').classList.remove('dialog');
+    obIndex = 0;
+    renderOnboard();
+    obScrim.classList.remove('hidden');
+    setIgnore(false);
+  }
   async function finishOnboard() {
     if (obDialog) { hideOnboardDialog(); return; }
     obScrim.classList.add('hidden');
+    restoreCollapsedAfterModal();
     if (settings && !settings.onboarded) { settings.onboarded = true; await cue.settingsSet({ onboarded: true }); }
   }
   $('#ob-next').addEventListener('click', () => { if (obIndex === OB_STEPS.length - 1) finishOnboard(); else { obIndex++; renderOnboard(); } });
@@ -2761,7 +2791,7 @@
       // Windows 10: update the onboarding screen recording button to be more helpful
       const ob = OB_STEPS.find((st) => st.permissions);
       ob.buttons = ob.buttons.filter((b) => !b.label.toLowerCase().includes('screen'));
-      ob.body = 'cue needs microphone permission to hear you. Click the button below to open Windows microphone settings and allow cue.<br><br><strong>Screen capture works automatically on Windows 10</strong> — no additional permission needed.<ul><li><strong>Microphone</strong> — to hear you</li><li><strong>Screen recording</strong> — works automatically on Windows 10</li></ul><span class="ob-fine">You can also do this later in Windows Settings.</span>';
+      ob.body = 'Angel X needs microphone permission to hear you. Click the button below to open Windows microphone settings and allow Angel X.<br><br><strong>Screen capture works automatically on Windows 10</strong> — no additional permission needed.<ul><li><strong>Microphone</strong> — to hear you</li><li><strong>Screen recording</strong> — works automatically on Windows 10</li></ul><span class="ob-fine">You can also do this later in Windows Settings.</span>';
     }
 
     smartBtn.classList.toggle('on', !!settings.smart);
@@ -2773,7 +2803,7 @@
 
     // Fix placeholder shortcut hint to match platform
     if (isWindows) {
-      placeholder.innerHTML = 'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist';
+      placeholder.innerHTML = 'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">&#8679;</span><span class="keycap">&#9166;</span> for Smart assist';
     }
 
     applyOpacity(settings.backgroundOpacity !== undefined ? settings.backgroundOpacity : settings.opacity, false);

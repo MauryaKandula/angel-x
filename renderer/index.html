@@ -92,7 +92,7 @@
 
             <div id="composer">
               <div id="input-area">
-                <div id="placeholder">Ask about your screen or conversation, or <span class="keycap">⌘</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist</div>
+                <div id="placeholder">Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">&#8679;</span><span class="keycap">&#9166;</span> for Smart assist</div>
                 <textarea id="input" rows="1" spellcheck="false"></textarea>
               </div>
               <div id="composer-bottom">
@@ -149,7 +149,7 @@
         <!-- Text and buttons are filled by renderPublikBlock() from publik:state
              and renderer/publik-card.js, so the copy has one source. -->
         <div id="publik-settings" class="publik-card hidden">
-          <div class="publik-lede" id="publik-lede">cue runs on your publik balance. You need no API key.</div>
+          <div class="publik-lede" id="publik-lede">Angel X runs on your publik balance or direct API keys. You need no complex setup.</div>
           <div class="publik-line" id="publik-status-note">Not connected.</div>
           <div class="publik-line warn hidden" id="publik-low-note"></div>
           <button id="publik-primary" class="s-action primary publik-primary hidden"></button>
@@ -177,7 +177,7 @@
           <button type="button" class="s-chip model-chip" data-fast="deepseek-chat" data-smart="deepseek-reasoner">⚡ DeepSeek</button>
         </div>
 
-        <label class="s-label">Assistant access <span class="s-hint">programs allowed to see what cue is doing</span></label>
+        <label class="s-label">Assistant access <span class="s-hint">programs allowed to see what Angel X is doing</span></label>
         <div class="s-callers" id="applink-callers"></div>
 
         <details id="byo-section" class="byo-section">
@@ -230,7 +230,7 @@
             <div class="s-field" data-key-for="azure"><span>Azure AI Foundry</span><input id="key-azure" type="password" placeholder="azure key or Entra token" autocomplete="off" /></div>
 
             <div id="azure-endpoint-settings" class="hidden">
-              <label class="s-label" for="azure-endpoint">Azure endpoint <span class="s-hint">Azure OpenAI: https://&lt;resource&gt;.openai.azure.com/openai · AI Foundry: https://&lt;host&gt;.cognitiveservices.azure.com (cue adds /openai/v1)</span></label>
+              <label class="s-label" for="azure-endpoint">Azure endpoint <span class="s-hint">Azure OpenAI: https://&lt;resource&gt;.openai.azure.com/openai · AI Foundry: https://&lt;host&gt;.cognitiveservices.azure.com (Angel X adds /openai/v1)</span></label>
               <div class="s-field"><span>Endpoint</span><input id="azure-endpoint" type="text" placeholder="https://host.cognitiveservices.azure.com" autocomplete="off" /></div>
             </div>
           </div>
@@ -313,7 +313,7 @@
 "></textarea>
         <div class="s-counter"><span id="ai-rules-count">0</span> / 2000</div>
         <div class="s-hint-block">
-          These rules tell cue <strong>how</strong> to write, not <strong>what</strong> to say. Use one imperative sentence per line (e.g. <em>Never use em-dashes.</em>). They apply to every mode except coding-problem solves (LeetCode), which stays strict. Stored locally; never sent anywhere except the AI provider when cue answers a question.
+          These rules tell Angel X <strong>how</strong> to write, not <strong>what</strong> to say. Use one imperative sentence per line (e.g. <em>Never use em-dashes.</em>). They apply to every mode except coding-problem solves (LeetCode), which stays strict. Stored locally; never sent anywhere except the AI provider when Angel X answers a question.
         </div>
       </div>
 
@@ -355,7 +355,7 @@
         <div class="s-field"><span>Toggle Click-Through</span><input id="sc-passthrough" type="text" autocomplete="off" spellcheck="false" /></div>
         <div class="s-field"><span>Emergency Click-Through Exit</span><input id="sc-emergencyClickThrough" type="text" autocomplete="off" spellcheck="false" /></div>
         <div class="s-field"><span>Capture Screen &amp; Analyze</span><input id="sc-screen" type="text" autocomplete="off" spellcheck="false" /></div>
-        <div class="s-field"><span>Quit Cue</span><input id="sc-quit" type="text" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-field"><span>Quit Angel X</span><input id="sc-quit" type="text" autocomplete="off" spellcheck="false" /></div>
         
         <div class="whisper-actions" style="margin-top: 14px;">
           <button id="sc-reset-defaults" class="s-action">Reset to Defaults</button>
@@ -389,7 +389,7 @@
   </div>
 
   <!-- Assistant access request. Shown in-window rather than as a native dialog:
-       cue hides its dock icon, so an OS panel never comes forward and cannot be
+       Angel X hides its dock icon, so an OS panel never comes forward and cannot be
        clicked. -->
   <div id="consent-scrim" class="hidden">
     <div id="consent" class="glass">

@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const platform = process.platform;
 
-contextBridge.exposeInMainWorld('cue', {
+const bridge = {
   platform,
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch),
@@ -60,4 +60,8 @@ contextBridge.exposeInMainWorld('cue', {
     if (!allowed.includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => cb(data));
   }
-});
+};
+
+contextBridge.exposeInMainWorld('cue', bridge);
+contextBridge.exposeInMainWorld('angel', bridge);
+contextBridge.exposeInMainWorld('angelX', bridge);
