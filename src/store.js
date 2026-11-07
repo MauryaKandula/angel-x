@@ -56,9 +56,13 @@ const DEFAULTS = {
     cardShown: false,         // the first-run card (CONTRACT §12.1) was shown for the current starter grant
     lastError: ''
   },
-  // Tab 2: Profile
+  // Tab 2: Profile & Pre-Session Context
   resumeText: '',
+  resumeFileName: '',
   jobDescription: '',
+  jdFileName: '',
+  sessionContext: '',
+  sessionDocFileName: '',
   // Tab 3: Interview Prep
   starStories: '',       // 3-5 behavioral STAR stories in plain English
   whyCompany: '',        // Why do you want to work here?

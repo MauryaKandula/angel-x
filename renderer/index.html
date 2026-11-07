@@ -27,6 +27,9 @@
       <button class="tb-gpt-chip" id="tb-gpt-btn" title="Access & Edit GPT API Key / Endpoint in Settings" aria-label="Configure GPT API Key">
         <span class="ic-cpu"></span><span class="tb-gpt-text">GPT</span><span class="tb-gpt-badge" id="tb-gpt-badge">API</span>
       </button>
+      <button class="tb-context-chip" id="tb-context-btn" title="Upload Resume, Documents &amp; Pre-Session Context" aria-label="Upload Resume and Session Context">
+        <span class="tb-context-text">📄 Docs</span><span class="tb-context-badge" id="tb-context-badge">Setup</span>
+      </button>
       <div class="tb-divider"></div>
       <button class="tb-compact" id="compact-btn" title="Toggle Compact Mode (Ctrl+Shift+M)" aria-label="Toggle Compact Mode"><span class="ic"></span></button>
       <button class="tb-clickthrough" id="clickthrough-btn" title="Toggle Mouse Click-Through (Ctrl+Shift+I)" aria-label="Toggle Mouse Click-Through"><span class="ic"></span></button>
@@ -73,6 +76,28 @@
           <!-- Left column: AI responses -->
           <div id="panel-main">
             <div id="messages"></div>
+
+            <!-- Pre-session prep & document context bar -->
+            <div id="pre-session-bar" class="pre-session-bar">
+              <div class="psb-header">
+                <div class="psb-title-row">
+                  <span class="psb-badge" id="psb-status-badge">PRE-SESSION PREP</span>
+                  <span class="psb-title" id="psb-title-text">Prepare Before Starting Live Session</span>
+                </div>
+                <div class="psb-actions">
+                  <button type="button" class="psb-btn psb-btn-primary" id="psb-upload-btn" title="Upload Resume, Job Description, or Reference PDF/DOCX/TXT">📄 Upload Resume / Docs</button>
+                  <button type="button" class="psb-btn" id="psb-context-btn" title="Set session context, talking points, and goals">🎯 Session Context</button>
+                  <button type="button" class="psb-toggle-btn" id="psb-toggle-btn" title="Collapse / Expand pre-session checklist">▾</button>
+                </div>
+              </div>
+              <div class="psb-body" id="psb-body">
+                <div class="psb-steps">
+                  <div class="psb-step"><span class="psb-num">1</span><span><strong>Upload Docs:</strong> Add your Resume, Job Description, or Meeting Notes (PDF, DOCX, TXT).</span></div>
+                  <div class="psb-step"><span class="psb-num">2</span><span><strong>Set Context:</strong> Tell Angel X your goal (e.g., Technical Interview, Sales Call, Standup).</span></div>
+                  <div class="psb-step"><span class="psb-num">3</span><span><strong>Start Live:</strong> Click <strong>Start session</strong> above, then press <kbd>Ctrl+Enter</kbd> (What to say) or <kbd>Ctrl+Shift+Enter</kbd> (Smart Assist).</span></div>
+                </div>
+              </div>
+            </div>
 
             <div id="action-row">
               <button class="act act-primary" data-mode="say"
@@ -136,6 +161,7 @@
       <!-- Tab bar -->
       <div class="s-tabs">
         <button class="s-tab on" data-tab="keys" id="s-tab-main">🪙 publik</button>
+        <button class="s-tab" data-tab="context" id="s-tab-context">📄 Docs &amp; Context</button>
         <button class="s-tab" data-tab="transcription">🔉 Audio</button>
         <button class="s-tab" data-tab="style">✨ Style</button>
         <button class="s-tab" data-tab="appearance">🌗 Appearance</button>
@@ -299,6 +325,72 @@
         <div class="s-field"><span>Track slides</span><input id="slides-enabled" type="checkbox" style="width:auto;" /></div>
         <div class="s-field"><span>Check every (ms)</span><input id="slides-interval" type="number" min="1500" max="15000" step="500" value="3000" /></div>
         <div class="s-note">Captures a tiny hash every few seconds, captions only on stable change with your chat model. No images stored; clear with transcript.</div>
+      </div>
+
+      <!-- Tab: Docs & Context -->
+      <div class="s-body s-tab-pane hidden" data-pane="context">
+        <div class="cyber-api-callout pre-session-callout">
+          <div class="cyber-api-title">📋 PRE-SESSION BRIEFING: WHAT TO DO BEFORE STARTING LIVE</div>
+          <div class="cyber-api-desc">
+            <strong>1. Upload Your Documents:</strong> Import your Resume/CV, Job Description, or Meeting Brief (<code>.pdf</code>, <code>.docx</code>, <code>.txt</code>, <code>.md</code>).<br />
+            <strong>2. Set Session Context:</strong> Pick a preset below or describe your goal so Angel X tailors every answer.<br />
+            <strong>3. Launch Live Session:</strong> Click <strong>Done</strong>, then press <strong>Start session</strong> in the top bar. Use <code>Ctrl + Enter</code> for instant speech suggestions or <code>Ctrl + Shift + Enter</code> for screen + audio Smart Assist.
+          </div>
+        </div>
+
+        <label class="s-label">Session Context &amp; Goal <span class="s-hint">what Angel X should focus on during this session</span></label>
+        <div class="model-presets">
+          <span class="preset-label">Quick Presets:</span>
+          <button type="button" class="s-chip session-preset-chip" data-preset="Interviewing for a role. Ground every response in my uploaded resume, highlight measurable impact, and structure behavioral answers using STAR.">💼 Job Interview</button>
+          <button type="button" class="s-chip session-preset-chip" data-preset="Technical &amp; system design session. Focus on architecture, scalability, trade-offs, complexity, and concise technical explanations.">💻 Technical / System Design</button>
+          <button type="button" class="s-chip session-preset-chip" data-preset="Client / sales discovery call. Help me uncover pain points, handle objections confidently, and guide toward concrete next steps.">🤝 Client / Sales Call</button>
+          <button type="button" class="s-chip session-preset-chip" data-preset="Team standup &amp; strategy meeting. Track key decisions, action items, and help me deliver crisp, high-signal updates.">📋 Team Meeting</button>
+        </div>
+        <div class="doc-upload-bar">
+          <button type="button" class="s-action doc-upload-btn" id="upload-session-doc-btn">📎 Upload Context / Notes File (PDF, DOCX, TXT)</button>
+          <button type="button" class="s-action danger" id="clear-session-doc-btn">Clear</button>
+          <span class="doc-file-badge" id="session-doc-status">No file attached</span>
+        </div>
+        <textarea id="session-context" rows="3" spellcheck="false" placeholder="Describe what this live session is about, key instructions, or upload a briefing document above..."></textarea>
+
+        <label class="s-label" style="margin-top: 10px;">Your Resume / CV <span class="s-hint">used to ground answers in your real experience &amp; skills</span></label>
+        <div class="doc-upload-bar">
+          <button type="button" class="s-action doc-upload-btn" id="upload-resume-btn">📄 Upload Resume (PDF, DOCX, TXT)</button>
+          <button type="button" class="s-action danger" id="clear-resume-btn">Clear</button>
+          <span class="doc-file-badge" id="resume-file-status">No resume uploaded</span>
+        </div>
+        <textarea id="resume-text" rows="4" spellcheck="false" placeholder="Paste your resume text here or click 'Upload Resume' above to import a PDF, DOCX, or TXT file..."></textarea>
+
+        <label class="s-label" style="margin-top: 10px;">Target Job Description / Reference Document <span class="s-hint">role requirements, spec, or agenda</span></label>
+        <div class="doc-upload-bar">
+          <button type="button" class="s-action doc-upload-btn" id="upload-jd-btn">📎 Upload Job Description / Doc</button>
+          <button type="button" class="s-action danger" id="clear-jd-btn">Clear</button>
+          <span class="doc-file-badge" id="jd-file-status">No document uploaded</span>
+        </div>
+        <textarea id="job-description" rows="3" spellcheck="false" placeholder="Paste the job description, company overview, or reference document here..."></textarea>
+
+        <details class="byo-section" id="interview-prep-details">
+          <summary><span>Talking Points, STAR Stories &amp; Q&amp;A Prep</span> <span class="s-hint">optional behavioral &amp; role details</span></summary>
+          <div class="byo-body">
+            <label class="s-label">STAR Stories &amp; Key Achievements <span class="s-hint">used for behavioral questions ("Tell me about a time...")</span></label>
+            <div class="doc-upload-bar">
+              <button type="button" class="s-action" id="upload-stories-btn">📎 Upload Stories File</button>
+              <button type="button" class="s-action danger" id="clear-stories-btn">Clear</button>
+            </div>
+            <textarea id="star-stories" rows="3" spellcheck="false" placeholder="List 2–4 real project stories (Situation, Task, Action, Result with metrics)..."></textarea>
+
+            <label class="s-label">Why This Company / Role</label>
+            <textarea id="why-company" rows="2" spellcheck="false" placeholder="Why you want this role/company and what excites you about their mission..."></textarea>
+
+            <label class="s-label">Work Style &amp; Strengths</label>
+            <textarea id="work-style" rows="2" spellcheck="false" placeholder="How you collaborate, make decisions, and handle ambiguity..."></textarea>
+
+            <div class="s-field"><span>Salary / Rate Target</span><input id="salary-target" type="text" autocomplete="off" placeholder="e.g. $160k–$185k base + equity" /></div>
+
+            <label class="s-label">Questions to Ask Them</label>
+            <textarea id="questions-to-ask" rows="2" spellcheck="false" placeholder="1. What does success look like in the first 90 days?"></textarea>
+          </div>
+        </details>
       </div>
 
       <!-- Tab: Style -->

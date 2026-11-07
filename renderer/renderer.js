@@ -62,6 +62,12 @@
     const title = active ? 'End session' : 'Start session';
     btn.title = title;
     btn.setAttribute('aria-label', title);
+    const psbBodyEl = document.getElementById('psb-body');
+    const psbToggleEl = document.getElementById('psb-toggle-btn');
+    if (psbBodyEl && active) {
+      psbBodyEl.classList.add('collapsed');
+      if (psbToggleEl) psbToggleEl.textContent = '▸';
+    }
   }
   setSessionButton(false);
 
@@ -1679,6 +1685,11 @@
     selectByoProvider();
   }
 
+  function openContextSettings() {
+    openSettings();
+    showSettingsTab('context');
+  }
+
   function updateGptChip(s) {
     const badge = typeof $ === 'function' ? $('#tb-gpt-badge') : null;
     if (!badge || !s) return;
@@ -1693,10 +1704,184 @@
     }
   }
 
+  function updateContextBadges(s) {
+    const cur = s || settings;
+    if (!cur) return;
+    const hasResume = !!(cur.resumeText && cur.resumeText.trim());
+    const hasJd = !!(cur.jobDescription && cur.jobDescription.trim());
+    const hasSession = !!(cur.sessionContext && cur.sessionContext.trim());
+    const loadedCount = (hasResume ? 1 : 0) + (hasJd ? 1 : 0) + (hasSession ? 1 : 0);
+
+    const tbBadge = document.getElementById('tb-context-badge');
+    if (tbBadge) {
+      tbBadge.textContent = loadedCount > 0 ? `${loadedCount} READY` : 'Setup';
+      tbBadge.classList.toggle('ready', loadedCount > 0);
+    }
+
+    const psbBadge = document.getElementById('psb-status-badge');
+    const psbTitle = document.getElementById('psb-title-text');
+    if (psbBadge && psbTitle) {
+      if (loadedCount > 0) {
+        const parts = [];
+        if (hasResume) parts.push(cur.resumeFileName || 'Resume');
+        if (hasJd) parts.push(cur.jdFileName || 'JD/Doc');
+        if (hasSession) parts.push(cur.sessionDocFileName || 'Session Goal');
+        psbBadge.textContent = '✓ CONTEXT READY';
+        psbBadge.classList.add('ready');
+        psbTitle.textContent = `Loaded: ${parts.join(' + ')}`;
+      } else {
+        psbBadge.textContent = 'PRE-SESSION PREP';
+        psbBadge.classList.remove('ready');
+        psbTitle.textContent = 'Upload Resume / Docs & Set Context Before Starting Live';
+      }
+    }
+
+    const resBadge = document.getElementById('resume-file-status');
+    if (resBadge) {
+      if (hasResume) {
+        const name = cur.resumeFileName ? `${cur.resumeFileName} ` : 'Resume ';
+        resBadge.textContent = `✓ ${name}(${cur.resumeText.trim().length.toLocaleString()} chars)`;
+        resBadge.classList.add('loaded');
+      } else {
+        resBadge.textContent = 'No resume uploaded';
+        resBadge.classList.remove('loaded');
+      }
+    }
+
+    const jdBadge = document.getElementById('jd-file-status');
+    if (jdBadge) {
+      if (hasJd) {
+        const name = cur.jdFileName ? `${cur.jdFileName} ` : 'Document ';
+        jdBadge.textContent = `✓ ${name}(${cur.jobDescription.trim().length.toLocaleString()} chars)`;
+        jdBadge.classList.add('loaded');
+      } else {
+        jdBadge.textContent = 'No document uploaded';
+        jdBadge.classList.remove('loaded');
+      }
+    }
+
+    const sessBadge = document.getElementById('session-doc-status');
+    if (sessBadge) {
+      if (hasSession) {
+        const name = cur.sessionDocFileName ? `${cur.sessionDocFileName} ` : 'Context ';
+        sessBadge.textContent = `✓ ${name}(${cur.sessionContext.trim().length.toLocaleString()} chars)`;
+        sessBadge.classList.add('loaded');
+      } else {
+        sessBadge.textContent = 'No file attached';
+        sessBadge.classList.remove('loaded');
+      }
+    }
+  }
+
+  async function handleDocUpload(targetTextareaId, fileNameField, appendMode = false) {
+    if (!cue || typeof cue.pickProfileDocument !== 'function') return;
+    const res = await cue.pickProfileDocument();
+    if (!res || res.canceled) return;
+    if (res.error) {
+      showStatus('Document import failed: ' + res.error);
+      return;
+    }
+    const el = document.getElementById(targetTextareaId);
+    if (el && typeof res.text === 'string') {
+      if (appendMode && el.value.trim()) {
+        el.value = el.value.trim() + '\n\n--- ' + (res.fileName || 'Document') + ' ---\n' + res.text;
+      } else {
+        el.value = res.text;
+      }
+    }
+    if (fileNameField && settings) {
+      settings[fileNameField] = res.fileName || 'Uploaded file';
+    }
+    await saveSettings();
+    updateContextBadges(settings);
+    showStatus(`Loaded ${res.fileName || 'document'} (${(res.text || '').length.toLocaleString()} chars).`);
+  }
+
   $('#more-btn').addEventListener('click', openSettings);
   $('#tb-settings-btn').addEventListener('click', openSettings);
   const tbGptBtn = $('#tb-gpt-btn');
   if (tbGptBtn) tbGptBtn.addEventListener('click', openOpenAISettings);
+  const tbContextBtn = document.getElementById('tb-context-btn');
+  if (tbContextBtn) tbContextBtn.addEventListener('click', openContextSettings);
+  const psbContextBtn = document.getElementById('psb-context-btn');
+  if (psbContextBtn) psbContextBtn.addEventListener('click', openContextSettings);
+  const psbUploadBtn = document.getElementById('psb-upload-btn');
+  if (psbUploadBtn) {
+    psbUploadBtn.addEventListener('click', () => {
+      openContextSettings();
+      void handleDocUpload('resume-text', 'resumeFileName', false);
+    });
+  }
+  const psbToggleBtn = document.getElementById('psb-toggle-btn');
+  const psbBody = document.getElementById('psb-body');
+  if (psbToggleBtn && psbBody) {
+    psbToggleBtn.addEventListener('click', () => {
+      const collapsed = psbBody.classList.toggle('collapsed');
+      psbToggleBtn.textContent = collapsed ? '▸' : '▾';
+    });
+  }
+
+  const uploadResumeBtn = document.getElementById('upload-resume-btn');
+  if (uploadResumeBtn) uploadResumeBtn.addEventListener('click', () => { void handleDocUpload('resume-text', 'resumeFileName', false); });
+  const clearResumeBtn = document.getElementById('clear-resume-btn');
+  if (clearResumeBtn) {
+    clearResumeBtn.addEventListener('click', async () => {
+      const el = document.getElementById('resume-text');
+      if (el) el.value = '';
+      if (settings) settings.resumeFileName = '';
+      await saveSettings();
+      updateContextBadges(settings);
+    });
+  }
+
+  const uploadJdBtn = document.getElementById('upload-jd-btn');
+  if (uploadJdBtn) uploadJdBtn.addEventListener('click', () => { void handleDocUpload('job-description', 'jdFileName', false); });
+  const clearJdBtn = document.getElementById('clear-jd-btn');
+  if (clearJdBtn) {
+    clearJdBtn.addEventListener('click', async () => {
+      const el = document.getElementById('job-description');
+      if (el) el.value = '';
+      if (settings) settings.jdFileName = '';
+      await saveSettings();
+      updateContextBadges(settings);
+    });
+  }
+
+  const uploadSessionDocBtn = document.getElementById('upload-session-doc-btn');
+  if (uploadSessionDocBtn) uploadSessionDocBtn.addEventListener('click', () => { void handleDocUpload('session-context', 'sessionDocFileName', true); });
+  const clearSessionDocBtn = document.getElementById('clear-session-doc-btn');
+  if (clearSessionDocBtn) {
+    clearSessionDocBtn.addEventListener('click', async () => {
+      const el = document.getElementById('session-context');
+      if (el) el.value = '';
+      if (settings) settings.sessionDocFileName = '';
+      await saveSettings();
+      updateContextBadges(settings);
+    });
+  }
+
+  const uploadStoriesBtn = document.getElementById('upload-stories-btn');
+  if (uploadStoriesBtn) uploadStoriesBtn.addEventListener('click', () => { void handleDocUpload('star-stories', null, true); });
+  const clearStoriesBtn = document.getElementById('clear-stories-btn');
+  if (clearStoriesBtn) {
+    clearStoriesBtn.addEventListener('click', async () => {
+      const el = document.getElementById('star-stories');
+      if (el) el.value = '';
+      await saveSettings();
+    });
+  }
+
+  document.querySelectorAll('.session-preset-chip').forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      const preset = chip.getAttribute('data-preset');
+      const el = document.getElementById('session-context');
+      if (preset && el) {
+        el.value = preset;
+        await saveSettings();
+        updateContextBadges(settings);
+      }
+    });
+  });
   document.querySelectorAll('.model-chip').forEach((chip) => {
     chip.addEventListener('click', async () => {
       const fast = chip.getAttribute('data-fast');
@@ -2084,6 +2269,16 @@
     if (slidesEnabled) slidesEnabled.checked = !!slidesCfg.enabled;
     const slidesInterval = $('#slides-interval');
     if (slidesInterval) slidesInterval.value = slidesCfg.intervalMs || 3000;
+    // Docs & Context tab
+    if ($('#session-context')) $('#session-context').value = settings.sessionContext || '';
+    if ($('#resume-text')) $('#resume-text').value = settings.resumeText || '';
+    if ($('#job-description')) $('#job-description').value = settings.jobDescription || '';
+    if ($('#star-stories')) $('#star-stories').value = settings.starStories || '';
+    if ($('#why-company')) $('#why-company').value = settings.whyCompany || '';
+    if ($('#work-style')) $('#work-style').value = settings.workStyle || '';
+    if ($('#salary-target')) $('#salary-target').value = settings.salaryTarget || '';
+    if ($('#questions-to-ask')) $('#questions-to-ask').value = settings.questionsToAsk || '';
+    if (typeof updateContextBadges === 'function') updateContextBadges(settings);
     // Style tab
     $('#ai-rules').value = settings.aiRules || '';
     updateAiRulesCounter();
@@ -2453,6 +2648,15 @@
       const v = Number.parseInt(slidesIntervalEl.value, 10) || 3000;
       settings.slides.intervalMs = Math.max(1500, Math.min(15000, v));
     }
+    // Docs & Context tab
+    if ($('#session-context')) settings.sessionContext = $('#session-context').value.trim();
+    if ($('#resume-text')) settings.resumeText = $('#resume-text').value.trim();
+    if ($('#job-description')) settings.jobDescription = $('#job-description').value.trim();
+    if ($('#star-stories')) settings.starStories = $('#star-stories').value.trim();
+    if ($('#why-company')) settings.whyCompany = $('#why-company').value.trim();
+    if ($('#work-style')) settings.workStyle = $('#work-style').value.trim();
+    if ($('#salary-target')) settings.salaryTarget = $('#salary-target').value.trim();
+    if ($('#questions-to-ask')) settings.questionsToAsk = $('#questions-to-ask').value.trim();
     // Style tab
     settings.aiRules = $('#ai-rules').value.trim();
     // Appearance tab
@@ -2477,6 +2681,7 @@
       $('#s-status').textContent = statusText();
       updateSmartTooltip();
       if (typeof updateGptChip === 'function') updateGptChip(settings);
+      if (typeof updateContextBadges === 'function') updateContextBadges(settings);
       return true;
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
@@ -2796,6 +3001,7 @@
   (async function boot() {
     settings = await cue.settingsGet();
     if (typeof updateGptChip === 'function') updateGptChip(settings);
+    if (typeof updateContextBadges === 'function') updateContextBadges(settings);
     const platformInfo = await cue.platformInfo();
     publikState = await cue.publikState();
     // A build with no app token never shows the option, and keeps the BYO

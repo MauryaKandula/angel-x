@@ -42,6 +42,16 @@ test('HTML structure includes Angel X overlay controls and GPT toolbar', () => {
   assert.ok(html.includes('class="model-presets"'), 'quick model preset chips');
   assert.ok(html.includes('data-tab="shortcuts"'), 'shortcuts settings tab');
   assert.ok(html.includes('data-pane="shortcuts"'), 'shortcuts settings panel');
+  assert.ok(html.includes('data-tab="context"'), 'docs & context settings tab');
+  assert.ok(html.includes('data-pane="context"'), 'docs & context settings panel');
+  assert.ok(html.includes('id="tb-context-btn"'), 'quick docs & context toolbar button');
+  assert.ok(html.includes('id="pre-session-bar"'), 'pre-session prep & context banner');
+  assert.ok(html.includes('id="upload-resume-btn"'), 'resume upload button');
+  assert.ok(html.includes('id="upload-jd-btn"'), 'job description upload button');
+  assert.ok(html.includes('id="upload-session-doc-btn"'), 'session context document upload button');
+  assert.ok(html.includes('id="session-context"'), 'session context textarea');
+  assert.ok(html.includes('id="resume-text"'), 'resume text textarea');
+  assert.ok(html.includes('id="job-description"'), 'job description textarea');
   assert.ok(html.includes('id="s-always-on-top"'), 'always-on-top setting checkbox');
   assert.ok(html.includes('id="s-compact-mode"'), 'compact mode setting checkbox');
 });

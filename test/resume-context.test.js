@@ -123,3 +123,27 @@ test('buildInterviewContext: JD tailor note included when JD is set', () => {
   assert.ok(ctx !== null);
   assert.ok(ctx.includes('Tailor'), 'should include tailor note when JD is set');
 });
+
+test('buildInterviewContext: injects pre-session context and instructions', () => {
+  const ctx = buildInterviewContext({
+    sessionContext: 'Focus on distributed consensus and Raft protocol architecture.'
+  }, 'assist', []);
+  assert.ok(ctx !== null);
+  assert.match(ctx, /Session Context & Pre-Session Instructions/);
+  assert.match(ctx, /Raft protocol/);
+});
+
+test('parseDocumentFile: extracts plain text from .txt and .md files', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { parseDocumentFile } = require('../src/resume');
+  const tmpFile = path.join(os.tmpdir(), `angel-x-doc-${Date.now()}.txt`);
+  fs.writeFileSync(tmpFile, '  Candidate Resume\nSenior AI Engineer  ', 'utf8');
+  try {
+    const parsed = await parseDocumentFile(tmpFile);
+    assert.equal(parsed, 'Candidate Resume\nSenior AI Engineer');
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+  }
+});

@@ -1,7 +1,9 @@
-// Extracts plain text from a resume/job-description file (PDF or DOCX) so it can be
-// dropped into the existing Settings textareas. No OCR — text layer only.
+// Extracts plain text from a resume/job-description/reference file (PDF, DOCX, TXT, MD, JSON, CSV)
+// so it can be dropped into the Settings textareas. No OCR — text layer only.
 const fs = require('fs');
 const path = require('path');
+
+const PLAIN_TEXT_EXTS = new Set(['.txt', '.md', '.markdown', '.json', '.csv', '.log']);
 
 async function parseDocumentFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -16,7 +18,10 @@ async function parseDocumentFile(filePath) {
     const res = await mammoth.extractRawText({ buffer: buf });
     return (res.value || '').trim();
   }
-  throw new Error('Unsupported file type: ' + (ext || '(none)') + '. Use a PDF or DOCX file.');
+  if (PLAIN_TEXT_EXTS.has(ext)) {
+    return buf.toString('utf8').trim();
+  }
+  throw new Error('Unsupported file type: ' + (ext || '(none)') + '. Use a PDF, DOCX, TXT, or MD file.');
 }
 
 module.exports = { parseDocumentFile };

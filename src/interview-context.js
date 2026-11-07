@@ -171,20 +171,26 @@ function buildInterviewContext(settings, mode, transcript) {
 
   const category = detectCategory(transcript || []);
 
-  const resume    = settings.resumeText || '';
-  const jd        = settings.jobDescription || '';
-  const stories   = settings.starStories || '';
-  const whyCo     = settings.whyCompany || '';
-  const whyLeave  = settings.whyLeaving || '';
-  const workStyle = settings.workStyle || '';
-  const salary    = settings.salaryTarget || '';
-  const questions = settings.questionsToAsk || '';
+  const resume     = settings.resumeText || '';
+  const jd         = settings.jobDescription || '';
+  const sessionCtx = settings.sessionContext || '';
+  const stories    = settings.starStories || '';
+  const whyCo      = settings.whyCompany || '';
+  const whyLeave   = settings.whyLeaving || '';
+  const workStyle  = settings.workStyle || '';
+  const salary     = settings.salaryTarget || '';
+  const questions  = settings.questionsToAsk || '';
 
-  const hasResume  = resume.trim().length > 0;
-  const hasStories = stories.trim().length > 0;
-  const hasJD      = jd.trim().length > 0;
+  const hasResume     = resume.trim().length > 0;
+  const hasStories    = stories.trim().length > 0;
+  const hasJD         = jd.trim().length > 0;
+  const hasSessionCtx = sessionCtx.trim().length > 0;
 
   const blocks = [];
+
+  if (hasSessionCtx) {
+    blocks.push('=== Session Context & Pre-Session Instructions ===\n' + clip(sessionCtx.trim(), 2000));
+  }
 
   // Always include resume if available (but size varies by category)
   if (hasResume) {
