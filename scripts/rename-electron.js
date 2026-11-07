@@ -38,8 +38,8 @@ if (!src && fs.existsSync(target)) {
 }
 
 // ── Step 2: Update path.txt ───────────────────────────────────────────────────
-fs.writeFileSync(pathTxt, DISPLAY_NAME);
-console.log(`[postinstall] path.txt -> ${DISPLAY_NAME}`);
+fs.writeFileSync(pathTxt, DISPLAY_NAME.trim(), 'utf8');
+console.log(`[postinstall] path.txt -> ${DISPLAY_NAME.trim()}`);
 
 // ── Step 3: Patch PE version info (retry a few times — Defender may scan briefly) ─
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
