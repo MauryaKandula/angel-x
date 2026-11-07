@@ -1298,6 +1298,11 @@
         row.appendChild(txt);
         list.appendChild(row);
         tsLastRow[channel] = row;
+
+        // Keep DOM lean for extended sessions (prevent memory bloating beyond 300 turns)
+        while (list.children.length > 300) {
+          list.firstElementChild.remove();
+        }
       }
 
       // Reset silence timer

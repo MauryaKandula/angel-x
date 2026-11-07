@@ -1215,6 +1215,15 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (patch && 'alwaysOnTop' in patch && win && !win.isDestroyed()) {
     win.setAlwaysOnTop(patch.alwaysOnTop !== false, 'screen-saver', 1);
   }
+  if (patch && 'screenProtection' in patch && win && !win.isDestroyed()) {
+    if (WIN_SUPPORTS_CONTENT_PROTECTION && !process.env.CUE_NO_PROTECT) {
+      try {
+        win.setContentProtection(patch.screenProtection !== false);
+      } catch (err) {
+        console.error('[Angel X] Failed to update screen protection:', err);
+      }
+    }
+  }
   updateTray();
   return store.redactForRenderer(next);
 });
