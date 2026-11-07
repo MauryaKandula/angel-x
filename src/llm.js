@@ -935,6 +935,12 @@ function createLLM(settings) {
       try {
         return await streamWith(provider, args, minimaxRegion);
       } catch (error) {
+        if (provider === 'gemini' && (error && (error.status === 402 || error.status === 429 || /402|429|quota|credit|depleted/i.test(error.message || ''))) && keys.groq) {
+          const groqFallbackModel = args.imageDataUrl ? 'qwen/qwen3.8-27b' : 'openai/gpt-oss-120b';
+          try {
+            return await streamWith('groq', { ...args, apiKey: keys.groq, model: groqFallbackModel }, minimaxRegion);
+          } catch (_) { /* fall through to original error */ }
+        }
         const retryModel = provider === PUBLIK_PROVIDER ? publikRefusalRetryModel(error, useModel, settings, !!args.imageDataUrl) : '';
         if (!retryModel || (args.signal && args.signal.aborted)) throw wrap(error, useModel);
         if (typeof args.onRetry === 'function') {
@@ -955,12 +961,34 @@ function createLLM(settings) {
   };
 }
 
+async function streamGroq(args) {
+  try {
+    return await streamOpenAI({ ...args, baseURL: 'https://api.groq.com/openai/v1' });
+  } catch (e) {
+    const msg = (e && e.message) || '';
+    const isModelOrVisionErr = isNotFoundError(e) || (e && e.status === 400 && /content must be a string|model|decommissioned/i.test(msg));
+    if (!isModelOrVisionErr) throw e;
+    const fallbacks = args.imageDataUrl
+      ? ['qwen/qwen3.8-27b', 'meta-llama/llama-4-scout-17b-16e-instruct']
+      : ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    for (const fb of fallbacks) {
+      if (fb === args.model) continue;
+      try {
+        return await streamOpenAI({ ...args, model: fb, baseURL: 'https://api.groq.com/openai/v1' });
+      } catch (fbErr) {
+        if (!isNotFoundError(fbErr) && !(fbErr && fbErr.status === 400)) throw fbErr;
+      }
+    }
+    throw e;
+  }
+}
+
 function streamWith(provider, args, minimaxRegion) {
   if (provider === 'openai') return streamOpenAI(args);
   if (provider === CUSTOM_PROVIDER) return streamOpenAI(args);
   if (provider === PUBLIK_PROVIDER) return streamOpenAI(args);
   if (provider === 'ollama') return streamOllama(args);
-  if (provider === 'groq') return streamOpenAI({ ...args, baseURL: 'https://api.groq.com/openai/v1' });
+  if (provider === 'groq') return streamGroq(args);
   if (provider === 'cerebras') return streamOpenAI({ ...args, baseURL: CEREBRAS_BASE_URL });
   if (provider === 'minimax') return streamOpenAI({ ...args, baseURL: MINIMAX_BASE_URLS[minimaxRegion] || MINIMAX_BASE_URLS.global_en });
   if (provider === 'deepseek') return streamOpenAI({ ...args, baseURL: DEEPSEEK_BASE_URL });
