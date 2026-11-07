@@ -124,19 +124,25 @@ class AppLinkServer extends EventEmitter {
     this.server = net.createServer((socket) => this.#accept(socket));
 
     await new Promise((resolve, reject) => {
-      const onError = (error) => reject(error);
-      this.server.once("error", onError);
-      // On Windows this is a named pipe. Note that libuv gives no way to pass
-      // FILE_FLAG_FIRST_PIPE_INSTANCE, so a Node server cannot claim exclusive
-      // ownership of the pipe name the way the plan's Windows notes assume —
-      // another instance under the same account can create a second instance of
-      // the same name. Same-user boundary again; MSIX packaging or a native
-      // addon is the fix, and both are open questions in the plan.
-      this.server.listen(this.socketPath, () => {
-        this.server.removeListener("error", onError);
-        this.server.on("error", (error) => this.emit("error", error));
-        resolve();
-      });
+      const listenPipe = (pipePath, isFallback) => {
+        const onError = (error) => {
+          this.server.removeListener("error", onError);
+          if (!isFallback && process.platform === "win32" && error && error.code === "EADDRINUSE") {
+            const fallbackPath = `${pipePath}-${process.pid}`;
+            this.socketPath = fallbackPath;
+            listenPipe(fallbackPath, true);
+            return;
+          }
+          reject(error);
+        };
+        this.server.once("error", onError);
+        this.server.listen(pipePath, () => {
+          this.server.removeListener("error", onError);
+          this.server.on("error", (error) => this.emit("error", error));
+          resolve();
+        });
+      };
+      listenPipe(this.socketPath, false);
     });
 
     if (process.platform !== "win32") {

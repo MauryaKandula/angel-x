@@ -445,8 +445,13 @@
       if (isLikelyCompleteQuestion(input.value)) {
         composer.classList.add('stt-ready');
         updateSendButtonState(); // FIX #9: Update send button when ready
-        // Subtle notification that question is ready
-        showToast('Press Enter to answer', 2500);
+        if (settings && settings.autoAnswer && !busy) {
+          showToast('⚡ Auto-Answering question…', 2000);
+          send();
+        } else {
+          // Subtle notification that question is ready
+          showToast('Press Enter to answer', 2500);
+        }
       }
     }, 1800);
 
@@ -2068,145 +2073,6 @@
     if (section && section.scrollIntoView) section.scrollIntoView({ block: 'nearest' });
   }
 
-  function detectProviderFromKey(rawKey) {
-    const k = (rawKey || '').trim();
-    if (!k) return null;
-    if (/^(AIza|AQ\.)/.test(k)) return 'gemini';
-    if (/^gsk_/.test(k)) return 'groq';
-    if (/^sk-ant-/.test(k)) return 'anthropic';
-    if (/^csk-/.test(k)) return 'cerebras';
-    if (/^sk-/.test(k)) return 'openai';
-    return null;
-  }
-
-  function updateFreeComboUI(s) {
-    const cur = s || settings;
-    if (!cur) return;
-    const gemInput = document.getElementById('quick-gemini-key');
-    const groqInput = document.getElementById('quick-groq-key');
-    const hasGem = !!(cur.apiKeys && cur.apiKeys.gemini && cur.apiKeys.gemini.trim());
-    const hasGroq = !!(cur.apiKeys && cur.apiKeys.groq && cur.apiKeys.groq.trim());
-    if (gemInput && document.activeElement !== gemInput) gemInput.value = (cur.apiKeys && cur.apiKeys.gemini) || '';
-    if (groqInput && document.activeElement !== groqInput) groqInput.value = (cur.apiKeys && cur.apiKeys.groq) || '';
-    const badge = document.getElementById('free-combo-badge');
-    if (badge) {
-      badge.classList.toggle('hidden', !(hasGem && hasGroq));
-    }
-    document.querySelectorAll('.quick-prov-pill').forEach((pill) => {
-      pill.classList.toggle('on', pill.getAttribute('data-qprov') === cur.provider);
-    });
-  }
-
-  const getGemBtn = document.getElementById('get-gemini-key-btn');
-  if (getGemBtn) getGemBtn.addEventListener('click', () => cue.openPane('https://aistudio.google.com/app/apikey'));
-  const getGroqBtn = document.getElementById('get-groq-key-btn');
-  if (getGroqBtn) getGroqBtn.addEventListener('click', () => cue.openPane('https://console.groq.com/keys'));
-
-  const toggleAdvBtn = document.getElementById('toggle-adv-providers-btn');
-  const advBox = document.getElementById('adv-providers-box');
-  if (toggleAdvBtn && advBox) {
-    toggleAdvBtn.addEventListener('click', () => {
-      const hidden = advBox.classList.toggle('hidden');
-      toggleAdvBtn.textContent = hidden ? 'All 10 Providers ▾' : 'Hide Providers ▴';
-    });
-  }
-
-  const quickGemEl = document.getElementById('quick-gemini-key');
-  if (quickGemEl) {
-    quickGemEl.addEventListener('input', () => {
-      if ($('#key-gemini')) $('#key-gemini').value = quickGemEl.value.trim();
-    });
-  }
-  const quickGroqEl = document.getElementById('quick-groq-key');
-  if (quickGroqEl) {
-    quickGroqEl.addEventListener('input', () => {
-      if ($('#key-groq')) $('#key-groq').value = quickGroqEl.value.trim();
-    });
-  }
-
-  const quickUniversalEl = document.getElementById('quick-api-key');
-  if (quickUniversalEl) {
-    quickUniversalEl.addEventListener('input', () => {
-      const val = quickUniversalEl.value.trim();
-      const det = detectProviderFromKey(val);
-      if (det === 'gemini') {
-        if (quickGemEl) quickGemEl.value = val;
-        if ($('#key-gemini')) $('#key-gemini').value = val;
-      } else if (det === 'groq') {
-        if (quickGroqEl) quickGroqEl.value = val;
-        if ($('#key-groq')) $('#key-groq').value = val;
-      } else if (det && $(`#key-${det}`)) {
-        $(`#key-${det}`).value = val;
-      }
-    });
-  }
-
-  document.querySelectorAll('.quick-prov-pill').forEach((pill) => {
-    pill.addEventListener('click', async () => {
-      const p = pill.getAttribute('data-qprov');
-      if (!p || !settings) return;
-      const segBtn = document.querySelector(`#provider-seg button[data-provider="${p}"]`);
-      if (segBtn) segBtn.click();
-      updateFreeComboUI(settings);
-      await saveSettings();
-    });
-  });
-
-  const quickSaveBtn = document.getElementById('quick-key-save-btn');
-  if (quickSaveBtn) {
-    quickSaveBtn.addEventListener('click', async () => {
-      if (!settings) return;
-      const uniVal = quickUniversalEl ? quickUniversalEl.value.trim() : '';
-      const det = detectProviderFromKey(uniVal);
-      if (det && $(`#key-${det}`)) {
-        $(`#key-${det}`).value = uniVal;
-        if (det === 'gemini' && quickGemEl) quickGemEl.value = uniVal;
-        if (det === 'groq' && quickGroqEl) quickGroqEl.value = uniVal;
-      }
-      if (quickGemEl && quickGemEl.value.trim() && $('#key-gemini')) {
-        $('#key-gemini').value = quickGemEl.value.trim();
-      }
-      if (quickGroqEl && quickGroqEl.value.trim() && $('#key-groq')) {
-        $('#key-groq').value = quickGroqEl.value.trim();
-      }
-      const gemVal = $('#key-gemini') ? $('#key-gemini').value.trim() : '';
-      const groqVal = $('#key-groq') ? $('#key-groq').value.trim() : '';
-
-      if (gemVal && groqVal) {
-        // Free Combo: Gemini Vision + Groq Whisper Audio
-        settings.provider = 'gemini';
-        settings.sttProvider = 'auto';
-        const gemBtn = document.querySelector('#provider-seg button[data-provider="gemini"]');
-        if (gemBtn) gemBtn.click();
-      } else if (groqVal && !gemVal && (!det || det === 'groq')) {
-        // Groq-only free setup: configure Llama 4 Scout Vision + Groq Whisper
-        settings.provider = 'groq';
-        settings.sttProvider = 'auto';
-        if (!settings.models.groq) settings.models.groq = {};
-        settings.models.groq.fast = 'llama-3.1-8b-instant';
-        settings.models.groq.smart = 'meta-llama/llama-4-scout-17b-16e-instruct';
-        const groqBtn = document.querySelector('#provider-seg button[data-provider="groq"]');
-        if (groqBtn) groqBtn.click();
-        if ($('#model-fast')) $('#model-fast').value = 'llama-3.1-8b-instant';
-        if ($('#model-smart')) $('#model-smart').value = 'meta-llama/llama-4-scout-17b-16e-instruct';
-      } else if (gemVal && !groqVal && (!det || det === 'gemini')) {
-        settings.provider = 'gemini';
-        const gemBtn = document.querySelector('#provider-seg button[data-provider="gemini"]');
-        if (gemBtn) gemBtn.click();
-      } else if (det) {
-        settings.provider = det;
-        const b = document.querySelector(`#provider-seg button[data-provider="${det}"]`);
-        if (b) b.click();
-      }
-
-      if (quickUniversalEl) quickUniversalEl.value = '';
-      await saveSettings();
-      updateFreeComboUI(settings);
-      renderSetupCta();
-      showToast(gemVal && groqVal ? '✓ Free Combo Active: Gemini Vision + Groq Audio!' : `✓ Saved & Activated ${settings.provider.toUpperCase()}!`, 2500);
-    });
-  }
-
   // Main may write models.publik (aliases from the mint) and the provider;
   // take just those from disk so unsaved edits in Settings survive.
   async function adoptPublikSelection() {
@@ -2365,6 +2231,145 @@
   $('#publik-pricing').addEventListener('click', () => cue.publikOpen(publikState ? publikState.links.pricing : ''));
   $('#publik-disconnect').addEventListener('click', async () => { publikState = await cue.publikDisconnect(); renderPublikBlock(); renderSetupCta(); });
   cue.on('publik:state', (state) => { publikState = state; renderPublikBlock(); renderSetupCta(); maybeShowLowStarter(state); });
+
+  function detectProviderFromKey(rawKey) {
+    const k = (rawKey || '').trim();
+    if (!k) return null;
+    if (/^(AIza|AQ\.)/.test(k)) return 'gemini';
+    if (/^gsk_/.test(k)) return 'groq';
+    if (/^sk-ant-/.test(k)) return 'anthropic';
+    if (/^csk-/.test(k)) return 'cerebras';
+    if (/^sk-/.test(k)) return 'openai';
+    return null;
+  }
+
+  function updateFreeComboUI(s) {
+    const cur = s || settings;
+    if (!cur) return;
+    const gemInput = document.getElementById('quick-gemini-key');
+    const groqInput = document.getElementById('quick-groq-key');
+    const hasGem = !!(cur.apiKeys && cur.apiKeys.gemini && cur.apiKeys.gemini.trim());
+    const hasGroq = !!(cur.apiKeys && cur.apiKeys.groq && cur.apiKeys.groq.trim());
+    if (gemInput && document.activeElement !== gemInput) gemInput.value = (cur.apiKeys && cur.apiKeys.gemini) || '';
+    if (groqInput && document.activeElement !== groqInput) groqInput.value = (cur.apiKeys && cur.apiKeys.groq) || '';
+    const badge = document.getElementById('free-combo-badge');
+    if (badge) {
+      badge.classList.toggle('hidden', !(hasGem && hasGroq));
+    }
+    document.querySelectorAll('.quick-prov-pill').forEach((pill) => {
+      pill.classList.toggle('on', pill.getAttribute('data-qprov') === cur.provider);
+    });
+  }
+
+  const getGemBtn = document.getElementById('get-gemini-key-btn');
+  if (getGemBtn) getGemBtn.addEventListener('click', () => cue.openPane('https://aistudio.google.com/app/apikey'));
+  const getGroqBtn = document.getElementById('get-groq-key-btn');
+  if (getGroqBtn) getGroqBtn.addEventListener('click', () => cue.openPane('https://console.groq.com/keys'));
+
+  const toggleAdvBtn = document.getElementById('toggle-adv-providers-btn');
+  const advBox = document.getElementById('adv-providers-box');
+  if (toggleAdvBtn && advBox) {
+    toggleAdvBtn.addEventListener('click', () => {
+      const hidden = advBox.classList.toggle('hidden');
+      toggleAdvBtn.textContent = hidden ? 'All 10 Providers ▾' : 'Hide Providers ▴';
+    });
+  }
+
+  const quickGemEl = document.getElementById('quick-gemini-key');
+  if (quickGemEl) {
+    quickGemEl.addEventListener('input', () => {
+      if ($('#key-gemini')) $('#key-gemini').value = quickGemEl.value.trim();
+    });
+  }
+  const quickGroqEl = document.getElementById('quick-groq-key');
+  if (quickGroqEl) {
+    quickGroqEl.addEventListener('input', () => {
+      if ($('#key-groq')) $('#key-groq').value = quickGroqEl.value.trim();
+    });
+  }
+
+  const quickUniversalEl = document.getElementById('quick-api-key');
+  if (quickUniversalEl) {
+    quickUniversalEl.addEventListener('input', () => {
+      const val = quickUniversalEl.value.trim();
+      const det = detectProviderFromKey(val);
+      if (det === 'gemini') {
+        if (quickGemEl) quickGemEl.value = val;
+        if ($('#key-gemini')) $('#key-gemini').value = val;
+      } else if (det === 'groq') {
+        if (quickGroqEl) quickGroqEl.value = val;
+        if ($('#key-groq')) $('#key-groq').value = val;
+      } else if (det && $(`#key-${det}`)) {
+        $(`#key-${det}`).value = val;
+      }
+    });
+  }
+
+  document.querySelectorAll('.quick-prov-pill').forEach((pill) => {
+    pill.addEventListener('click', async () => {
+      const p = pill.getAttribute('data-qprov');
+      if (!p || !settings) return;
+      const segBtn = document.querySelector(`#provider-seg button[data-provider="${p}"]`);
+      if (segBtn) segBtn.click();
+      updateFreeComboUI(settings);
+      await saveSettings();
+    });
+  });
+
+  const quickSaveBtn = document.getElementById('quick-key-save-btn');
+  if (quickSaveBtn) {
+    quickSaveBtn.addEventListener('click', async () => {
+      if (!settings) return;
+      const uniVal = quickUniversalEl ? quickUniversalEl.value.trim() : '';
+      const det = detectProviderFromKey(uniVal);
+      if (det && $(`#key-${det}`)) {
+        $(`#key-${det}`).value = uniVal;
+        if (det === 'gemini' && quickGemEl) quickGemEl.value = uniVal;
+        if (det === 'groq' && quickGroqEl) quickGroqEl.value = uniVal;
+      }
+      if (quickGemEl && quickGemEl.value.trim() && $('#key-gemini')) {
+        $('#key-gemini').value = quickGemEl.value.trim();
+      }
+      if (quickGroqEl && quickGroqEl.value.trim() && $('#key-groq')) {
+        $('#key-groq').value = quickGroqEl.value.trim();
+      }
+      const gemVal = $('#key-gemini') ? $('#key-gemini').value.trim() : '';
+      const groqVal = $('#key-groq') ? $('#key-groq').value.trim() : '';
+
+      if (gemVal && groqVal) {
+        // Free Combo: Gemini Vision + Groq Whisper Audio
+        settings.provider = 'gemini';
+        settings.sttProvider = 'auto';
+        const gemBtn = document.querySelector('#provider-seg button[data-provider="gemini"]');
+        if (gemBtn) gemBtn.click();
+      } else if (groqVal && !gemVal && (!det || det === 'groq')) {
+        // Groq-only free setup: configure Qwen 3.8 / GPT-OSS + Groq Whisper
+        settings.provider = 'groq';
+        settings.sttProvider = 'auto';
+        if (!settings.models.groq) settings.models.groq = {};
+        settings.models.groq.fast = 'qwen/qwen3.8-27b';
+        settings.models.groq.smart = 'openai/gpt-oss-120b';
+        const groqBtn = document.querySelector('#provider-seg button[data-provider="groq"]');
+        if (groqBtn) groqBtn.click();
+        if ($('#model-fast')) $('#model-fast').value = 'qwen/qwen3.8-27b';
+        if ($('#model-smart')) $('#model-smart').value = 'openai/gpt-oss-120b';
+      } else if (gemVal && !groqVal && (!det || det === 'gemini')) {
+        settings.provider = 'gemini';
+        const gemBtn = document.querySelector('#provider-seg button[data-provider="gemini"]');
+        if (gemBtn) gemBtn.click();
+      } else if (det) {
+        settings.provider = det;
+        const b = document.querySelector(`#provider-seg button[data-provider="${det}"]`);
+        if (b) b.click();
+      }
+
+      if (quickUniversalEl) quickUniversalEl.value = '';
+      await saveSettings();
+      updateFreeComboUI(settings);
+      renderSetupCta();
+      showToast(gemVal && groqVal ? '✓ Free Combo Active: Gemini Vision + Groq Audio!' : `✓ Saved & Activated ${settings.provider.toUpperCase()}!`, 2500);
+    });
+  }
 
   // ---- first-run prompt in the overlay ------------------------------------
   // While nothing can answer, the top of the panel says how to start. With

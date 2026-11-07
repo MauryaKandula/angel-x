@@ -936,9 +936,9 @@ function createLLM(settings) {
         return await streamWith(provider, args, minimaxRegion);
       } catch (error) {
         if (provider === 'gemini' && (error && (error.status === 402 || error.status === 429 || /402|429|quota|credit|depleted/i.test(error.message || ''))) && keys.groq) {
-          const groqFallbackModel = args.imageDataUrl ? 'qwen/qwen3.8-27b' : 'openai/gpt-oss-120b';
+          const groqFallbackModel = 'qwen/qwen3.8-27b';
           try {
-            return await streamWith('groq', { ...args, apiKey: keys.groq, model: groqFallbackModel }, minimaxRegion);
+            return await streamGroq({ ...args, apiKey: keys.groq, model: groqFallbackModel });
           } catch (_) { /* fall through to original error */ }
         }
         const retryModel = provider === PUBLIK_PROVIDER ? publikRefusalRetryModel(error, useModel, settings, !!args.imageDataUrl) : '';
@@ -966,16 +966,24 @@ async function streamGroq(args) {
     return await streamOpenAI({ ...args, baseURL: 'https://api.groq.com/openai/v1' });
   } catch (e) {
     const msg = (e && e.message) || '';
-    const isModelOrVisionErr = isNotFoundError(e) || (e && e.status === 400 && /content must be a string|model|decommissioned/i.test(msg));
+    const isModelOrVisionErr = isNotFoundError(e) || (e && e.status === 400 && /content must be a string|model|decommissioned|image/i.test(msg));
     if (!isModelOrVisionErr) throw e;
-    const fallbacks = args.imageDataUrl
-      ? ['qwen/qwen3.8-27b', 'meta-llama/llama-4-scout-17b-16e-instruct']
-      : ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    const fallbacks = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
     for (const fb of fallbacks) {
-      if (fb === args.model) continue;
       try {
-        return await streamOpenAI({ ...args, model: fb, baseURL: 'https://api.groq.com/openai/v1' });
+        const nextArgs = { ...args, model: fb, baseURL: 'https://api.groq.com/openai/v1' };
+        if (e && e.status === 400 && /content must be a string|image/i.test(msg)) {
+          delete nextArgs.imageDataUrl;
+        }
+        return await streamOpenAI(nextArgs);
       } catch (fbErr) {
+        if (fbErr && fbErr.status === 400 && nextArgs.imageDataUrl) {
+          try {
+            const textOnlyArgs = { ...nextArgs };
+            delete textOnlyArgs.imageDataUrl;
+            return await streamOpenAI(textOnlyArgs);
+          } catch (_) {}
+        }
         if (!isNotFoundError(fbErr) && !(fbErr && fbErr.status === 400)) throw fbErr;
       }
     }

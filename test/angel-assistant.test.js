@@ -97,3 +97,15 @@ test('tray and icon assets exist and are valid PNGs', () => {
   assert.ok(trayIcon.subarray(0, 8).equals(pngSig), 'tray-icon.png is a valid PNG');
   assert.ok(appIcon.subarray(0, 8).equals(pngSig), 'icon.png is a valid PNG');
 });
+
+test('opacity chip selector only attaches to elements with data-val so preset chips never reset opacity to 0', () => {
+  const renderer = fs.readFileSync(path.join(__dirname, '../renderer/renderer.js'), 'utf8');
+  assert.ok(renderer.includes(".querySelectorAll('.opacity-chip, .s-opacity-presets .s-chip[data-val]')"), 'scoped opacity chip selector');
+  assert.ok(!renderer.includes(".querySelectorAll('.opacity-chip, .s-chip')"), 'unscoped .s-chip opacity listener removed');
+});
+
+test('AppLinkServer falls back to PID-suffixed pipe on Windows EADDRINUSE instead of crashing', () => {
+  const serverSrc = fs.readFileSync(path.join(__dirname, '../vendor/app-link/lib/server.js'), 'utf8');
+  assert.ok(serverSrc.includes('error.code === "EADDRINUSE"'), 'handles EADDRINUSE on Windows named pipe');
+  assert.ok(serverSrc.includes('`${pipePath}-${process.pid}`'), 'falls back to PID-suffixed pipe');
+});
