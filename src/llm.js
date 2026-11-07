@@ -688,14 +688,37 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
   const config = geminiGenerationConfig({ system, maxTokens, thinking });
   if (signal) config.abortSignal = signal;
   let stream;
+  const tryGenerate = async (targetModel, cfg) => {
+    try {
+      return await ai.models.generateContentStream({ model: targetModel, contents, config: cfg });
+    } catch (e) {
+      if (cfg.thinkingConfig && /thinking/i.test((e && e.message) || '')) {
+        const nextCfg = { ...cfg };
+        delete nextCfg.thinkingConfig;
+        return await ai.models.generateContentStream({ model: targetModel, contents, config: nextCfg });
+      }
+      throw e;
+    }
+  };
   try {
-    stream = await ai.models.generateContentStream({ model, contents, config });
+    stream = await tryGenerate(model, config);
   } catch (e) {
-    // A model that predates thinkingLevel (or a custom id that rejects it)
-    // should still answer: retry once without the thinking setting.
-    if (!config.thinkingConfig || !/thinking/i.test((e && e.message) || '')) throw e;
-    delete config.thinkingConfig;
-    stream = await ai.models.generateContentStream({ model, contents, config });
+    if (!isNotFoundError(e)) throw e;
+    const fallbacks = ['2.5-flash', '2.0-flash', '1.5-flash'].map((v) => 'gemini-' + v).filter((m) => m !== model);
+    let lastErr = e;
+    for (const fb of fallbacks) {
+      try {
+        const fbCfg = { ...config };
+        delete fbCfg.thinkingConfig;
+        stream = await tryGenerate(fb, fbCfg);
+        lastErr = null;
+        break;
+      } catch (fbErr) {
+        lastErr = fbErr;
+        if (!isNotFoundError(fbErr)) throw fbErr;
+      }
+    }
+    if (lastErr) throw lastErr;
   }
   // finishReason comes on the last candidate: STOP, MAX_TOKENS, SAFETY,
   // RECITATION, ... A blocked prompt has no candidate, only

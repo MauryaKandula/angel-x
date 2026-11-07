@@ -15,28 +15,21 @@
         <span class="drag-dots" aria-hidden="true"></span>
         <span class="drag-label">Angel X</span>
       </div>
-      <button class="tb-logo" id="logo-btn" title="How to use Angel X" aria-label="How to use Angel X"></button>
-      <button class="tb-settings" id="tb-settings-btn" title="Settings" aria-label="Settings"></button>
-      <div class="tb-divider"></div>
-      <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
-      <div class="tb-divider"></div>
       <button class="tb-stop" id="stop-btn" title="Start session" aria-label="Start session">
         <span class="ic"></span><span class="tb-stop-label">Start session</span>
       </button>
-      <div class="tb-divider"></div>
-      <button class="tb-gpt-chip" id="tb-gpt-btn" title="Access & Edit GPT API Key / Endpoint in Settings" aria-label="Configure GPT API Key">
-        <span class="ic-cpu"></span><span class="tb-gpt-text">GPT</span><span class="tb-gpt-badge" id="tb-gpt-badge">API</span>
+      <button class="tb-scan-chip" id="tb-scan-btn" title="Scan Screen &amp; Answer Question (Ctrl+Shift+Enter)" aria-label="Scan Screen">
+        <span>🔍 Scan</span>
+      </button>
+      <button class="tb-gpt-chip" id="tb-gpt-btn" title="Quick API Key Setup (Gemini / Groq / OpenAI)" aria-label="Configure API Key">
+        <span class="ic-cpu"></span><span class="tb-gpt-text">Key</span><span class="tb-gpt-badge" id="tb-gpt-badge">API</span>
       </button>
       <button class="tb-context-chip" id="tb-context-btn" title="Upload Resume, Documents &amp; Pre-Session Context" aria-label="Upload Resume and Session Context">
         <span class="tb-context-text">📄 Docs</span><span class="tb-context-badge" id="tb-context-badge">Setup</span>
       </button>
       <div class="tb-divider"></div>
-      <button class="tb-compact" id="compact-btn" title="Toggle Compact Mode (Ctrl+Shift+M)" aria-label="Toggle Compact Mode"><span class="ic"></span></button>
-      <button class="tb-clickthrough" id="clickthrough-btn" title="Toggle Mouse Click-Through (Ctrl+Shift+I)" aria-label="Toggle Mouse Click-Through"><span class="ic"></span></button>
-      <button class="tb-pin" id="pin-btn" title="Toggle Always On Top" aria-label="Toggle Always On Top"><span class="ic"></span></button>
-      <div class="tb-divider"></div>
       <div class="tb-opacity-wrap">
-        <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
+        <button class="tb-opacity" id="opacity-btn" title="Window Controls &amp; Opacity" aria-label="Window Controls &amp; Opacity" aria-expanded="false">
           <span class="ic"></span>
         </button>
         <div id="opacity-popover" class="opacity-popover hidden">
@@ -52,9 +45,16 @@
             <button class="opacity-chip" data-val="75">75%</button>
             <button class="opacity-chip" data-val="100">Solid</button>
           </div>
+          <div class="popover-toggles">
+            <button class="tb-compact" id="compact-btn" title="Toggle Compact Mode (Ctrl+Shift+M)" aria-label="Toggle Compact Mode"><span class="ic"></span><span>Compact</span></button>
+            <button class="tb-clickthrough" id="clickthrough-btn" title="Toggle Mouse Click-Through (Ctrl+Shift+I)" aria-label="Toggle Mouse Click-Through"><span class="ic"></span><span>Click-Through</span></button>
+            <button class="tb-pin" id="pin-btn" title="Toggle Always On Top" aria-label="Toggle Always On Top"><span class="ic"></span><span>Pin Top</span></button>
+          </div>
         </div>
       </div>
-      <div class="tb-divider"></div>
+      <button class="tb-settings" id="tb-settings-btn" title="Settings" aria-label="Settings"></button>
+      <button class="tb-logo" id="logo-btn" title="How to use Angel X" aria-label="How to use Angel X"></button>
+      <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
       <button class="tb-quit" id="quit-btn" title="Quit Angel X" aria-label="Quit Angel X"></button>
     </div>
 
@@ -77,39 +77,32 @@
           <div id="panel-main">
             <div id="messages"></div>
 
-            <!-- Pre-session prep & document context bar -->
+            <!-- Sleek single-line pre-session & auto-answer bar -->
             <div id="pre-session-bar" class="pre-session-bar">
               <div class="psb-header">
                 <div class="psb-title-row">
-                  <span class="psb-badge" id="psb-status-badge">PRE-SESSION PREP</span>
-                  <span class="psb-title" id="psb-title-text">Prepare Before Starting Live Session</span>
+                  <span class="psb-badge" id="psb-status-badge">PREP</span>
+                  <span class="psb-title" id="psb-title-text">Ready for Screen &amp; Live Audio</span>
                 </div>
                 <div class="psb-actions">
-                  <button type="button" class="psb-btn psb-btn-primary" id="psb-upload-btn" title="Upload Resume, Job Description, or Reference PDF/DOCX/TXT">📄 Upload Resume / Docs</button>
-                  <button type="button" class="psb-btn" id="psb-context-btn" title="Set session context, talking points, and goals">🎯 Session Context</button>
-                  <button type="button" class="psb-toggle-btn" id="psb-toggle-btn" title="Collapse / Expand pre-session checklist">▾</button>
-                </div>
-              </div>
-              <div class="psb-body" id="psb-body">
-                <div class="psb-steps">
-                  <div class="psb-step"><span class="psb-num">1</span><span><strong>Upload Docs:</strong> Add your Resume, Job Description, or Meeting Notes (PDF, DOCX, TXT).</span></div>
-                  <div class="psb-step"><span class="psb-num">2</span><span><strong>Set Context:</strong> Tell Angel X your goal (e.g., Technical Interview, Sales Call, Standup).</span></div>
-                  <div class="psb-step"><span class="psb-num">3</span><span><strong>Start Live:</strong> Click <strong>Start session</strong> above, then press <kbd>Ctrl+Enter</kbd> (What to say) or <kbd>Ctrl+Shift+Enter</kbd> (Smart Assist).</span></div>
+                  <button type="button" class="psb-btn psb-btn-primary" id="psb-upload-btn" title="Upload Resume, Job Description, or PDF/DOCX/TXT">📄 Upload Resume/Doc</button>
+                  <button type="button" class="psb-btn" id="psb-context-btn" title="Set session context &amp; goals">🎯 Context</button>
+                  <button type="button" class="psb-btn psb-auto-btn" id="auto-answer-btn" title="Automatically answer questions detected in live audio transcript">⚡ Auto-Answer: OFF</button>
                 </div>
               </div>
             </div>
 
             <div id="action-row">
-              <button class="act act-primary" data-mode="say"
-                title="Suggests what to say next based on the conversation">
-                <span class="ic"></span><span>What should I say?</span>
-                <span class="shortcut-hint" id="say-shortcut-hint"></span>
+              <button class="act act-primary" data-mode="assist"
+                title="Scans your screen and conversation to answer any visible question">
+                <span class="ic"></span><span>🔍 Scan Screen</span>
+                <span class="shortcut-hint" id="assist-shortcut-hint"></span>
               </button>
               <span class="sep">•</span>
-              <button class="act act-secondary" data-mode="assist"
-                title="Scans your screen and conversation to decide what you need">
-                <span class="ic"></span><span>Smart assist</span>
-                <span class="shortcut-hint" id="assist-shortcut-hint"></span>
+              <button class="act act-secondary" data-mode="say"
+                title="Suggests what to say next based on the conversation">
+                <span class="ic"></span><span>💬 What to say</span>
+                <span class="shortcut-hint" id="say-shortcut-hint"></span>
               </button>
               <span class="sep">•</span>
               <button class="act" data-mode="recap"><span class="ic"></span><span>Recap</span></button>
@@ -210,54 +203,89 @@
           <summary id="byo-summary"><span id="byo-title">Use your own API key instead</span> <span class="s-hint" id="byo-current"></span></summary>
           <div class="byo-body">
             <div class="cyber-api-callout">
-              <div class="cyber-api-title">⚡ NEURAL LINK: ANY GPT ENGINE</div>
-              <div class="cyber-api-desc">Enter your OpenAI GPT key below (GPT-4o, GPT-4o-mini, o1) or choose <strong>Custom</strong> for any OpenAI-compatible API gateway (OpenRouter, DeepSeek, Local LLM, Ollama, LM Studio).</div>
-            </div>
-            <label class="s-label">Provider</label>
-            <div class="s-seg" id="provider-seg">
-              <button data-provider="cerebras">Cerebras</button>
-              <button data-provider="openai">OpenAI</button>
-              <button data-provider="anthropic">Anthropic</button>
-              <button data-provider="gemini">Gemini</button>
-              <button data-provider="groq">Groq</button>
-              <button data-provider="custom">Custom</button>
-              <button data-provider="ollama">Ollama</button>
-              <button data-provider="minimax">MiniMax</button>
-              <button data-provider="deepseek">DeepSeek</button>
-              <button data-provider="azure">Azure AI</button>
+              <div class="cyber-api-title">⚡ QUICK API KEY SETUP — FREE COMBO (GEMINI + GROQ)</div>
+              <div class="cyber-api-desc">Paste a free <strong>Gemini</strong> key (Screen Vision) and/or <strong>Groq</strong> key (Live Audio STT + Vision) below, or drop any key into the auto-detect box.</div>
             </div>
 
-            <label class="s-label">API keys &amp; URLs <span class="s-hint">stored locally · never sent to any server</span></label>
-            <div class="s-field" data-key-for="cerebras"><span>Cerebras</span><input id="key-cerebras" type="password" placeholder="csk-..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="openai"><span>OpenAI</span><input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="anthropic"><span>Anthropic</span><input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="gemini"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="deepgram"><span>Deepgram</span><input id="key-deepgram" type="password" placeholder="dg-..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="groq"><span>Groq</span><input id="key-groq" type="password" placeholder="gsk_..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="custom"><span>Custom</span><input id="key-custom" type="password" placeholder="optional" autocomplete="off" /></div>
-            <div class="s-field" data-key-for="minimax"><span>MiniMax</span><input id="key-minimax" type="password" placeholder="MiniMax API key" autocomplete="off" /></div>
+            <div id="free-combo-badge" class="free-combo-badge hidden">✓ FREE COMBO ACTIVE: Gemini Vision + Groq Whisper Audio ($0/mo)</div>
 
-            <div id="minimax-region-settings" class="hidden">
-              <label class="s-label">MiniMax region <span class="s-hint">keys are region-bound — a Global key will 401 against China, and vice versa</span></label>
-              <div class="s-seg" id="minimax-region-seg">
-                <button data-region="global_en">Global</button>
-                <button data-region="cn_zh">China</button>
+            <div class="free-combo-grid">
+              <div class="free-combo-card">
+                <div class="free-combo-head">
+                  <span class="free-combo-label">✨ Gemini Key <small>(Free Screen Vision &amp; AI)</small></span>
+                  <button type="button" class="free-key-link" id="get-gemini-key-btn">Get Free Gemini Key ↗</button>
+                </div>
+                <input id="quick-gemini-key" type="text" placeholder="AIza... or AQ...." autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="free-combo-card">
+                <div class="free-combo-head">
+                  <span class="free-combo-label">⚡ Groq Key <small>(Free Live Audio STT &amp; Fast AI)</small></span>
+                  <button type="button" class="free-key-link" id="get-groq-key-btn">Get Free Groq Key ↗</button>
+                </div>
+                <input id="quick-groq-key" type="text" placeholder="gsk_..." autocomplete="off" spellcheck="false" />
               </div>
             </div>
 
-            <div id="custom-endpoint-settings" class="hidden">
-              <label class="s-label" for="base-url">Custom endpoint <span class="s-hint">OpenAI-compatible chat API</span></label>
-              <div class="s-field"><span>Base URL</span><input id="base-url" type="url" placeholder="http://127.0.0.1:18789/v1" autocomplete="off" spellcheck="false" /></div>
-              <div class="s-help">Your Custom key and LLM requests are sent to this URL. To also use it for speech-to-text, pick Custom on the Audio tab — otherwise transcription uses OpenAI or Groq.</div>
+            <div class="quick-universal-row">
+              <input id="quick-api-key" type="text" placeholder="Or paste any API key here (auto-detects Gemini, Groq, OpenAI, Anthropic, Cerebras)..." autocomplete="off" spellcheck="false" />
+              <button type="button" class="s-action primary" id="quick-key-save-btn">Save &amp; Activate</button>
             </div>
 
-            <div class="s-field" data-key-for="ollama"><span>Ollama URL</span><input id="key-ollama" type="text" placeholder="http://localhost:11434" autocomplete="off" /></div>
-            <div class="s-field" data-key-for="deepseek"><span>DeepSeek</span><input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" /></div>
-            <div class="s-field" data-key-for="azure"><span>Azure AI Foundry</span><input id="key-azure" type="password" placeholder="azure key or Entra token" autocomplete="off" /></div>
+            <div class="quick-provider-pills">
+              <span class="preset-label">Active AI:</span>
+              <button type="button" class="s-chip quick-prov-pill" data-qprov="gemini">✨ Gemini (Free)</button>
+              <button type="button" class="s-chip quick-prov-pill" data-qprov="groq">⚡ Groq (Free)</button>
+              <button type="button" class="s-chip quick-prov-pill" data-qprov="openai">🧠 OpenAI</button>
+              <button type="button" class="s-action" id="toggle-adv-providers-btn" style="margin-left:auto;">All 10 Providers ▾</button>
+            </div>
 
-            <div id="azure-endpoint-settings" class="hidden">
-              <label class="s-label" for="azure-endpoint">Azure endpoint <span class="s-hint">Azure OpenAI: https://&lt;resource&gt;.openai.azure.com/openai · AI Foundry: https://&lt;host&gt;.cognitiveservices.azure.com (Angel X adds /openai/v1)</span></label>
-              <div class="s-field"><span>Endpoint</span><input id="azure-endpoint" type="text" placeholder="https://host.cognitiveservices.azure.com" autocomplete="off" /></div>
+            <div id="adv-providers-box" class="adv-providers-box hidden">
+              <label class="s-label">Provider</label>
+              <div class="s-seg" id="provider-seg">
+                <button data-provider="cerebras">Cerebras</button>
+                <button data-provider="openai">OpenAI</button>
+                <button data-provider="anthropic">Anthropic</button>
+                <button data-provider="gemini">Gemini</button>
+                <button data-provider="groq">Groq</button>
+                <button data-provider="custom">Custom</button>
+                <button data-provider="ollama">Ollama</button>
+                <button data-provider="minimax">MiniMax</button>
+                <button data-provider="deepseek">DeepSeek</button>
+                <button data-provider="azure">Azure AI</button>
+              </div>
+
+              <label class="s-label">API keys &amp; URLs <span class="s-hint">stored locally · never sent to any server</span></label>
+              <div class="s-field" data-key-for="cerebras"><span>Cerebras</span><input id="key-cerebras" type="password" placeholder="csk-..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="openai"><span>OpenAI</span><input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="anthropic"><span>Anthropic</span><input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="gemini"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="deepgram"><span>Deepgram</span><input id="key-deepgram" type="password" placeholder="dg-..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="groq"><span>Groq</span><input id="key-groq" type="password" placeholder="gsk_..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="custom"><span>Custom</span><input id="key-custom" type="password" placeholder="optional" autocomplete="off" /></div>
+              <div class="s-field" data-key-for="minimax"><span>MiniMax</span><input id="key-minimax" type="password" placeholder="MiniMax API key" autocomplete="off" /></div>
+
+              <div id="minimax-region-settings" class="hidden">
+                <label class="s-label">MiniMax region <span class="s-hint">keys are region-bound — a Global key will 401 against China, and vice versa</span></label>
+                <div class="s-seg" id="minimax-region-seg">
+                  <button data-region="global_en">Global</button>
+                  <button data-region="cn_zh">China</button>
+                </div>
+              </div>
+
+              <div id="custom-endpoint-settings" class="hidden">
+                <label class="s-label" for="base-url">Custom endpoint <span class="s-hint">OpenAI-compatible chat API</span></label>
+                <div class="s-field"><span>Base URL</span><input id="base-url" type="url" placeholder="http://127.0.0.1:18789/v1" autocomplete="off" spellcheck="false" /></div>
+                <div class="s-help">Your Custom key and LLM requests are sent to this URL.</div>
+              </div>
+
+              <div class="s-field" data-key-for="ollama"><span>Ollama URL</span><input id="key-ollama" type="text" placeholder="http://localhost:11434" autocomplete="off" /></div>
+              <div class="s-field" data-key-for="deepseek"><span>DeepSeek</span><input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" /></div>
+              <div class="s-field" data-key-for="azure"><span>Azure AI Foundry</span><input id="key-azure" type="password" placeholder="azure key or Entra token" autocomplete="off" /></div>
+
+              <div id="azure-endpoint-settings" class="hidden">
+                <label class="s-label" for="azure-endpoint">Azure endpoint <span class="s-hint">Azure OpenAI or AI Foundry</span></label>
+                <div class="s-field"><span>Endpoint</span><input id="azure-endpoint" type="text" placeholder="https://host.cognitiveservices.azure.com" autocomplete="off" /></div>
+              </div>
             </div>
           </div>
         </details>

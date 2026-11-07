@@ -86,8 +86,9 @@ const DEFAULTS = {
   startCollapsed: true,
   screenProtection: true,
   clickThrough: false,
+  autoAnswer: false,
   panelWidth: 700,
-  panelHeight: 600,
+  panelHeight: 640,
   shortcuts: { ...SHORTCUT_DEFAULTS },
   // Slides: opt-in auto slide tracking (memory-only, forwarded, never written to disk).
   slides: {

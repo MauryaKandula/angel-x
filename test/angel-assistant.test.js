@@ -54,6 +54,13 @@ test('HTML structure includes Angel X overlay controls and GPT toolbar', () => {
   assert.ok(html.includes('id="job-description"'), 'job description textarea');
   assert.ok(html.includes('id="s-always-on-top"'), 'always-on-top setting checkbox');
   assert.ok(html.includes('id="s-compact-mode"'), 'compact mode setting checkbox');
+  assert.ok(html.includes('id="quick-gemini-key"'), 'quick Gemini key input');
+  assert.ok(html.includes('id="quick-groq-key"'), 'quick Groq key input');
+  assert.ok(html.includes('id="get-gemini-key-btn"'), 'get free Gemini key link button');
+  assert.ok(html.includes('id="get-groq-key-btn"'), 'get free Groq key link button');
+  assert.ok(html.includes('id="free-combo-badge"'), 'free combo active badge');
+  assert.ok(html.includes('id="auto-answer-btn"'), 'live auto-answer toggle button');
+  assert.ok(html.includes('id="tb-scan-btn"'), '1-click scan screen button in toolbar');
 });
 
 test('CSS styles support high-contrast transparent background and HUD theme', () => {

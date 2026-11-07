@@ -122,7 +122,6 @@ class AppLinkServer extends EventEmitter {
     this.socketPath = prepareSocketPath(this.appId, this.pathOptions);
 
     this.server = net.createServer((socket) => this.#accept(socket));
-    this.server.on("error", (error) => this.emit("error", error));
 
     await new Promise((resolve, reject) => {
       const onError = (error) => reject(error);
@@ -135,6 +134,7 @@ class AppLinkServer extends EventEmitter {
       // addon is the fix, and both are open questions in the plan.
       this.server.listen(this.socketPath, () => {
         this.server.removeListener("error", onError);
+        this.server.on("error", (error) => this.emit("error", error));
         resolve();
       });
     });

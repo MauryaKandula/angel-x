@@ -286,8 +286,8 @@ function saveWindowPosition() {
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
   const savedSettings = store.getSettings();
-  const currentPanelW = savedSettings.panelWidth || MAIN_W;
-  const currentH = savedSettings.panelHeight || 600;
+  const currentPanelW = Math.max(680, savedSettings.panelWidth || MAIN_W);
+  const currentH = Math.max(640, savedSettings.panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const isStartCollapsed = savedSettings.startCollapsed !== false || savedSettings.compactMode;
   isPanelCollapsed = isStartCollapsed;
@@ -1579,8 +1579,8 @@ function setCompactMode(compact) {
   store.setSettings({ compactMode });
   if (win && !win.isDestroyed()) {
     const bounds = win.getBounds();
-    const currentPanelW = store.getSettings().panelWidth || MAIN_W;
-    const currentH = store.getSettings().panelHeight || 600;
+    const currentPanelW = Math.max(680, store.getSettings().panelWidth || MAIN_W);
+    const currentH = Math.max(640, store.getSettings().panelHeight || 640);
     const W = SIDE_W + currentPanelW + SIDE_W;
     if (compactMode) {
       const newX = isPanelCollapsed ? bounds.x : (bounds.x + SIDE_W);
@@ -1588,8 +1588,10 @@ function setCompactMode(compact) {
       win.setBounds({ x: newX, y: bounds.y, width: currentPanelW, height: BAR_H });
     } else {
       const newX = isPanelCollapsed ? (bounds.x - SIDE_W) : bounds.x;
+      const disp = screen.getDisplayMatching(bounds) || screen.getPrimaryDisplay();
+      const clampedY = Math.max(disp.workArea.y, Math.min(bounds.y, disp.workArea.y + disp.workArea.height - currentH));
       isPanelCollapsed = false;
-      win.setBounds({ x: newX, y: bounds.y, width: W, height: currentH });
+      win.setBounds({ x: newX, y: clampedY, width: W, height: currentH });
     }
   }
   send('compact:changed', { compact: compactMode });
@@ -1600,18 +1602,28 @@ ipcMain.on('panel:collapse', (_e, collapsed) => {
   if (!win || win.isDestroyed()) return;
   const wasCollapsed = isPanelCollapsed;
   isPanelCollapsed = !!collapsed;
-  if (wasCollapsed === isPanelCollapsed) return;
   const bounds = win.getBounds();
-  const currentPanelW = store.getSettings().panelWidth || MAIN_W;
-  const currentH = store.getSettings().panelHeight || 600;
+  const currentPanelW = Math.max(680, store.getSettings().panelWidth || MAIN_W);
+  const currentH = Math.max(640, store.getSettings().panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W;
+
+  if (wasCollapsed === isPanelCollapsed) {
+    if (!isPanelCollapsed && bounds.height < 640) {
+      const disp = screen.getDisplayMatching(bounds) || screen.getPrimaryDisplay();
+      const clampedY = Math.max(disp.workArea.y, Math.min(bounds.y, disp.workArea.y + disp.workArea.height - currentH));
+      win.setBounds({ x: bounds.x, y: clampedY, width: W, height: currentH });
+    }
+    return;
+  }
 
   if (isPanelCollapsed) {
     const newX = bounds.x + SIDE_W;
     win.setBounds({ x: newX, y: bounds.y, width: currentPanelW, height: BAR_H });
   } else {
     const newX = bounds.x - SIDE_W;
-    win.setBounds({ x: newX, y: bounds.y, width: W, height: currentH });
+    const disp = screen.getDisplayMatching(bounds) || screen.getPrimaryDisplay();
+    const clampedY = Math.max(disp.workArea.y, Math.min(bounds.y, disp.workArea.y + disp.workArea.height - currentH));
+    win.setBounds({ x: newX, y: clampedY, width: W, height: currentH });
   }
 });
 
@@ -1708,8 +1720,8 @@ function centerWindow() {
   const currentDisplay = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
   const { workArea } = currentDisplay;
   const savedSettings = store.getSettings();
-  const currentPanelW = savedSettings.panelWidth || MAIN_W;
-  const currentH = savedSettings.panelHeight || 600;
+  const currentPanelW = Math.max(680, savedSettings.panelWidth || MAIN_W);
+  const currentH = Math.max(640, savedSettings.panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
   const startY = workArea.y + 6;

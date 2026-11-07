@@ -89,14 +89,31 @@ async function transcribeGeminiWith(ai, wav, now = Date.now()) {
       transcribeModelDownUntil = now + TRANSCRIBE_MODEL_COOLDOWN_MS;
     }
   }
-  const res = await ai.models.generateContent({
-    model: CURRENT_GEMINI_DEFAULT,
-    contents: [{ role: 'user', parts: [
-      { text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.' },
-      audio
-    ] }]
-  });
-  return extractGeminiTranscript(res);
+  const promptContents = [{ role: 'user', parts: [
+    { text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.' },
+    audio
+  ] }];
+  try {
+    const res = await ai.models.generateContent({
+      model: CURRENT_GEMINI_DEFAULT,
+      contents: promptContents
+    });
+    return extractGeminiTranscript(res);
+  } catch (e) {
+    if (!isNotFoundError(e)) throw e;
+    const fallbacks = ['2.5-flash', '2.0-flash'].map((v) => 'gemini-' + v);
+    let lastErr = e;
+    for (const fb of fallbacks) {
+      try {
+        const res = await ai.models.generateContent({ model: fb, contents: promptContents });
+        return extractGeminiTranscript(res);
+      } catch (fbErr) {
+        lastErr = fbErr;
+        if (!isNotFoundError(fbErr)) throw fbErr;
+      }
+    }
+    throw lastErr;
+  }
 }
 
 async function transcribeGemini(apiKey, wav) {
