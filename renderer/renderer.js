@@ -590,7 +590,7 @@
     let sawDuplicate = false;
     for (const q of questions) {
       const cleaned = String(q || '').trim();
-      if (cleaned.length < 12) continue;
+      if (!cleaned) continue;
       if (!isLikelyCompleteQuestion(cleaned)) continue;
       const norm = normalizeQuestionKey(cleaned);
       if (isQuestionRecentlyAnswered(cleaned) || autoAnswerQueue.some((queued) => normalizeQuestionKey(queued) === norm)) {

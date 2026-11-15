@@ -29,7 +29,8 @@ class CueAudioProcessor extends AudioWorkletProcessor {
     const n = this._writeIndex;
     let sumSq = 0;
     for (let i = 0; i < n; i++) {
-      const sample = this._buffer[i];
+      const raw = this._buffer[i];
+      const sample = Number.isFinite(raw) ? raw : 0;
       sumSq += sample * sample;
     }
     const rms = n > 0 ? Math.sqrt(sumSq / n) : 0;
@@ -38,7 +39,9 @@ class CueAudioProcessor extends AudioWorkletProcessor {
     // Convert Float32 [-1,1] to Int16 PCM with smooth AGC on quiet speech
     const pcm = new Int16Array(n);
     for (let i = 0; i < n; i++) {
-      const s = Math.max(-1, Math.min(1, this._buffer[i] * gain));
+      const raw = this._buffer[i];
+      const sample = Number.isFinite(raw) ? raw : 0;
+      const s = Math.max(-1, Math.min(1, sample * gain));
       pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     this.port.postMessage(pcm.buffer, [pcm.buffer]);

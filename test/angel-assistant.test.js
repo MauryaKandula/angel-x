@@ -201,6 +201,85 @@ test('AudioWorklet processor uses 2048-sample chunks and applies Float32 RMS AGC
   assert.strictEqual(clipOut[0], 32767);
 });
 
+test('AudioWorklet processor _flush() sanitizes NaN, Infinity, and -Infinity without poisoning RMS/gain or PCM output', () => {
+  const vm = require('node:vm');
+  const src = fs.readFileSync(path.join(__dirname, '../renderer/audio-worklet-processor.js'), 'utf8');
+
+  let RegisteredClass = null;
+  class StubAudioWorkletProcessor {
+    constructor() {
+      this.posted = [];
+      this.port = { postMessage: (buf) => this.posted.push(new Int16Array(buf)) };
+    }
+  }
+  const ctx = vm.createContext({
+    AudioWorkletProcessor: StubAudioWorkletProcessor,
+    Float32Array,
+    Int16Array,
+    Math,
+    Number,
+    registerProcessor: (_name, cls) => { RegisteredClass = cls; }
+  });
+  vm.runInContext(src, ctx);
+  assert.ok(RegisteredClass, 'processor registered');
+
+  const proc = new RegisteredClass();
+
+  // 1. Quiet speech (0.02) mixed with NaN, Infinity, -Infinity in a full 2048-sample chunk
+  const fullChunk = new Float32Array(2048).fill(0.02);
+  fullChunk[0] = NaN;
+  fullChunk[1] = Infinity;
+  fullChunk[2] = -Infinity;
+  fullChunk[3] = -0.02;
+  for (let offset = 0; offset < 2048; offset += 128) {
+    proc.process([[fullChunk.subarray(offset, offset + 128)]], [], {});
+  }
+  assert.strictEqual(proc.posted.length, 1);
+  const mixedOut = proc.posted[0];
+  assert.strictEqual(mixedOut.length, 2048);
+  assert.strictEqual(mixedOut[0], 0, 'NaN sample must sanitize to 0');
+  assert.strictEqual(mixedOut[1], 0, 'Infinity sample must sanitize to 0 without +32767 spike');
+  assert.strictEqual(mixedOut[2], 0, '-Infinity sample must sanitize to 0 without -32768 spike');
+  assert.ok(mixedOut[3] < -2000, `negative finite quiet sample keeps negative AGC boost (got ${mixedOut[3]})`);
+  assert.ok(mixedOut[10] > 2000 && mixedOut[10] < 3000, `finite quiet samples keep ~4x AGC boost (got ${mixedOut[10]})`);
+  assert.strictEqual(proc._writeIndex, 0);
+
+  // 2. Buffer containing solely non-finite values produces all zeros cleanly
+  proc.posted.length = 0;
+  const allBad = new Float32Array(2048);
+  for (let i = 0; i < 2048; i++) {
+    allBad[i] = i % 3 === 0 ? NaN : (i % 3 === 1 ? Infinity : -Infinity);
+  }
+  for (let offset = 0; offset < 2048; offset += 128) {
+    proc.process([[allBad.subarray(offset, offset + 128)]], [], {});
+  }
+  assert.strictEqual(proc.posted.length, 1);
+  const allBadOut = proc.posted[0];
+  assert.strictEqual(allBadOut.length, 2048);
+  assert.ok(allBadOut.every((v) => v === 0), 'all non-finite buffer must flush to pure zeros');
+
+  // 3. Direct partial _flush() and empty _flush() handle non-finite samples and empty length safely
+  proc.posted.length = 0;
+  proc._buffer[0] = Infinity;
+  proc._buffer[1] = -Infinity;
+  proc._buffer[2] = NaN;
+  proc._buffer[3] = 0.02;
+  proc._writeIndex = 4;
+  proc._flush();
+  assert.strictEqual(proc._writeIndex, 0);
+  const partialOut = proc.posted[0];
+  assert.strictEqual(partialOut.length, 4);
+  assert.strictEqual(partialOut[0], 0);
+  assert.strictEqual(partialOut[1], 0);
+  assert.strictEqual(partialOut[2], 0);
+  assert.ok(partialOut[3] > 2000, `partial flush finite sample retains valid AGC (got ${partialOut[3]})`);
+
+  proc.posted.length = 0;
+  proc._flush();
+  assert.strictEqual(proc.posted.length, 1);
+  assert.strictEqual(proc.posted[0].length, 0);
+});
+
 test('STT buildVocabPrompt includes sessionContext and groq/openai/custom pass promptWithContext + continuedText', async () => {
   const sttPath = require.resolve('../src/stt');
   const openaiPath = require.resolve('openai');
@@ -592,7 +671,7 @@ test('Renderer continuous multi-question queue, pause-wait, speaker echo guard, 
 
   vm.runInContext(
     autoFillSlice + '\n' + ipcSlice +
-    '\nthis.__api = { isLikelyCompleteQuestion, splitIntoQuestions, autoAnswerQueue, vadSpeaking };',
+    '\nthis.__api = { isLikelyCompleteQuestion, splitIntoQuestions, enqueueAutoAnswerQuestions, autoAnswerQueue, vadSpeaking };',
     ctx
   );
 
@@ -646,6 +725,32 @@ test('Renderer continuous multi-question queue, pause-wait, speaker echo guard, 
   advanceTimersBy(2000);
   assert.strictEqual(runModeCalls.length, 3);
   assert.strictEqual(runModeCalls[2].text, 'How would you design an LRU cache from scratch?');
+
+  // 4. Short '?' follow-ups (<12 chars, e.g. 'Why Redis?') are preserved in queue and sequentially auto-answered on llm:done
+  handlers['llm:done']();
+  handlers['transcript']({ channel: 'them', text: 'What is caching? Why Redis?' });
+  advanceTimersBy(1200);
+  assert.strictEqual(runModeCalls.length, 4);
+  assert.strictEqual(runModeCalls[3].text, 'What is caching?');
+  assert.deepStrictEqual(Array.from(api.autoAnswerQueue), ['Why Redis?']);
+
+  handlers['llm:done']();
+  assert.strictEqual(runModeCalls.length, 5);
+  assert.strictEqual(runModeCalls[4].text, 'Why Redis?');
+  assert.strictEqual(api.autoAnswerQueue.length, 0);
+
+  // Standalone short '?' question (11 chars) is also accepted, while single-word/empty fragments are rejected
+  handlers['llm:done']();
+  handlers['transcript']({ channel: 'them', text: 'Is it fast?' });
+  advanceTimersBy(1200);
+  assert.strictEqual(runModeCalls.length, 6);
+  assert.strictEqual(runModeCalls[5].text, 'Is it fast?');
+
+  handlers['llm:done']();
+  assert.strictEqual(api.enqueueAutoAnswerQuestions('Really?'), 0);
+  assert.strictEqual(api.enqueueAutoAnswerQuestions('Why?'), 0);
+  assert.strictEqual(api.enqueueAutoAnswerQuestions('   '), 0);
+  assert.strictEqual(runModeCalls.length, 6);
 });
 
 test('Renderer fixes: lowercase split guard, brief-blip softClearSTTFill recovery, multi-clause you preamble, and AGC NaN safety', () => {
