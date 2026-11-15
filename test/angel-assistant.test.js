@@ -671,7 +671,7 @@ test('Renderer continuous multi-question queue, pause-wait, speaker echo guard, 
 
   vm.runInContext(
     autoFillSlice + '\n' + ipcSlice +
-    '\nthis.__api = { isLikelyCompleteQuestion, splitIntoQuestions, enqueueAutoAnswerQuestions, autoAnswerQueue, vadSpeaking };',
+    '\nthis.__api = { isLikelyCompleteQuestion, getQuestionConfidence, splitIntoQuestions, enqueueAutoAnswerQuestions, autoAnswerQueue, vadSpeaking };',
     ctx
   );
 
@@ -747,6 +747,9 @@ test('Renderer continuous multi-question queue, pause-wait, speaker echo guard, 
   assert.strictEqual(runModeCalls[5].text, 'Is it fast?');
 
   handlers['llm:done']();
+  assert.strictEqual(api.getQuestionConfidence('Is it?'), 'high');
+  assert.strictEqual(api.getQuestionConfidence('Why so?'), 'high');
+  assert.strictEqual(api.getQuestionConfidence('Really?'), 'low');
   assert.strictEqual(api.enqueueAutoAnswerQuestions('Really?'), 0);
   assert.strictEqual(api.enqueueAutoAnswerQuestions('Why?'), 0);
   assert.strictEqual(api.enqueueAutoAnswerQuestions('   '), 0);

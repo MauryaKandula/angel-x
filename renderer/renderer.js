@@ -481,6 +481,7 @@
   // ---- Get question confidence level ----
   function getQuestionConfidence(text) {
     const trimmed = (text || '').trim();
+    if (/\?$/.test(trimmed) && isLikelyCompleteQuestion(trimmed)) return 'high';
     if (trimmed.length < 8) return 'low';
     if (/\?$/.test(trimmed)) return 'high';
     if (isLikelyCompleteQuestion(trimmed)) return 'medium';
