@@ -224,7 +224,11 @@
   // that is still streaming is never cleared under it.
   function armBusyFailsafe() {
     clearTimeout(busyFailsafe);
-    busyFailsafe = setTimeout(() => { busy = false; $('#send-btn').classList.toggle('busy', false); }, 40000);
+    busyFailsafe = setTimeout(() => {
+      busy = false;
+      $('#send-btn').classList.toggle('busy', false);
+      if (typeof processAutoAnswerQueue === 'function') processAutoAnswerQueue();
+    }, 40000);
   }
 
   function onAnswerActivity() {
@@ -293,7 +297,7 @@
   let softClearTimer = null;
   let userSpeechStart = null;
   let questionFinalizeWaitCount = 0;
-  const MAX_QUESTION_WAIT_EXTENSIONS = 4;
+  const MAX_QUESTION_WAIT_EXTENSIONS = 10;
 
   // Live VAD + speaker-echo guard + pause-aware multi-question queue
   const vadSpeaking = { you: false, them: false };
@@ -381,28 +385,34 @@
   function isLikelyCompleteQuestion(text) {
     const trimmed = (text || '').trim();
     const cleaned = trimmed.replace(/[.!]+$/, '').trim();
+    const wordCount = cleaned ? cleaned.split(/\s+/).length : 0;
+
+    // Short direct questions ending with ? (e.g. "Why Redis?", "Is it fast?")
+    if (/\?$/.test(trimmed) && (cleaned.length >= 12 || (cleaned.length >= 6 && wordCount >= 2))) {
+      return true;
+    }
 
     // Must be substantial (not just filler words)
     if (cleaned.length < 12) return false;
-
-    // High confidence: ends with question mark
-    if (/\?$/.test(trimmed)) return true;
 
     // High confidence: behavioral & technical interview patterns (complete even without ?)
     const behavioralPatterns = [
       /tell me about a time/i,
       /tell me about yourself/i,
       /tell me about your/i,
-      /give (?:me )?an example/i,
+      /give (?:me |us )?an example/i,
       /describe (?:a|the|an|your) (?:situation|time|project|challenge|bug|outage|system|architecture|experience|approach)/i,
-      /walk me through/i,
+      /walk (?:me|us) through/i,
+      /(?:i(?:'d| would)|we(?:'d| would)) like to (?:hear|know|ask|understand)/i,
+      /let(?:'s| us) talk about/i,
+      /please (?:describe|explain|tell|share|walk|elaborate|introduce)/i,
       /(?:can|could|would|will) you (?:tell|describe|explain|share|walk|elaborate|give|clarify|talk)/i,
       /(?:what|which|how|why|when|where|who) (?:was|were|is|are|did|do|does|would|could|should|can|have|has|had|makes|made)\b/i,
       /have you (?:ever|worked|used|built|designed|implemented|managed|dealt)/i,
       /do you (?:have|know|think|prefer|use|work)/i,
       /are you (?:familiar|comfortable|experienced|able)/i,
       /explain (?:how|what|why|the difference|your)/i,
-      /what(?:'s| is) the difference between/i,
+      /what(?:'s| is| are) the (?:difference|differences|pros and cons|trade-?offs|advantages|disadvantages|benefits|main|key|best|primary)\b/i,
       /compare\s+.+\s+(?:with|and|to|vs)\b/i,
       /what.{1,30}(?:biggest|greatest|most|hardest|proudest|challenging|difficult)/i
     ];
@@ -410,7 +420,7 @@
 
     // Medium confidence: question starters with substantial content
     const questionStarters = /^(what|how|why|when|where|who|which|tell|describe|explain|walk|compare|define|can|could|would|should|have|has|did|do|does|is|are|was|were|will)\b/i;
-    if (questionStarters.test(cleaned) && cleaned.length > 22) return true;
+    if (questionStarters.test(cleaned) && (cleaned.length > 22 || (cleaned.length >= 16 && wordCount >= 4))) return true;
 
     // Medium confidence: ends with common question endings
     if (/(about that|for us|to us|with you|for you|about it|to share|you handle|you approach|your experience|your background|in your opinion|would you say|do you think)\s*$/i.test(cleaned)) return true;
@@ -431,19 +441,20 @@
     });
 
     let safe = raw;
-    safe = mask(safe, /\b(?:e\.g|i\.e|vs|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|etc|approx|Inc|Ltd)\./gi);
+    safe = mask(safe, /\b(?:e\.g|i\.e|vs|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|etc|approx|Inc|Ltd|U\.S|U\.K|U\.N|a\.m|p\.m)\./gi);
     safe = mask(safe, /\b[a-zA-Z0-9_-]+\.(?:js|ts|jsx|tsx|py|go|io|ai|net|com|org|dev|edu|gov)\b/gi);
     safe = mask(safe, /\d+\.\d+(?:\.\d+)?/g);
 
     const rawSegments = safe
-      .split(/(?<=[?!])\s+|\n+|\s+(?=\d+[.)]\s+[A-Za-z])|(?<=\.)\s+(?=[A-Z"']|(?:what|how|why|when|where|who|which|tell|describe|explain|walk|compare|can|could|would|should|have|do|did|is|are)\b)/i)
+      .split(/(?<=[?!])\s+|\n+|\s+(?=\d+[.)]\s+[A-Za-z])|(?<=\.)\s+(?=[A-Z"']|(?:[Ww]hat|[Hh]ow|[Ww]hy|[Ww]hen|[Ww]here|[Ww]ho|[Ww]hich|[Tt]ell|[Dd]escribe|[Ee]xplain|[Ww]alk|[Cc]ompare|[Cc]an|[Cc]ould|[Ww]ould|[Ss]hould|[Hh]ave|[Dd]o|[Dd]id|[Ii]s|[Aa]re|[Pp]lease|[Gg]ive)\b)/)
       .map((seg) => seg.replace(/\u0000P(\d+)\u0000/g, (_, idx) => placeholders[Number(idx)]).replace(/^\d+[.)]\s+/, '').trim())
       .filter(Boolean);
 
     const questions = [];
     let preamble = '';
     for (const seg of rawSegments) {
-      if (questions.length > 0 && seg.length < 12) {
+      const shortDistinctQuestion = /^(?:what|how|why|when|where|who|which|can|could|would|is|are|do|did)\b/i.test(seg) && /\?$/.test(seg);
+      if (questions.length > 0 && seg.length < 12 && !shortDistinctQuestion) {
         questions[questions.length - 1] = `${questions[questions.length - 1]} ${seg}`.trim();
         continue;
       }
@@ -673,15 +684,19 @@
     const finalizeDelay = confidence === 'high' ? 900 : (confidence === 'medium' ? 1250 : 1750);
     armQuestionFinalizeTimer(finalizeDelay, sourceChannel);
 
-    // After 8s of no new words, save to history and keep stable
+    // After idle timeout, clear un-questioned candidate chatter on 'you', or stabilize 'them'
     clearTimeout(sttFillTimer);
     sttFillTimer = setTimeout(() => {
+      if (sourceChannel === 'you' && inputFromSTT && lastSTTChannel === 'you' && input.value === lastSTTValue && !isLikelyCompleteQuestion(input.value)) {
+        clearSTTComposerForAutoAnswer();
+        return;
+      }
       saveToQuestionHistory(input.value);
       composer.classList.remove('stt-filling');
       // Keep stt-ready if applicable
       updateQuestionReadyState();
       updateSendButtonState(); // FIX #9
-    }, 8000);
+    }, sourceChannel === 'you' ? 4500 : 8000);
   }
 
   // ---- Soft clear: don't immediately wipe question when user speaks ----
@@ -715,10 +730,18 @@
         saveToQuestionHistory(input.value);
         input.value = '';
         inputFromSTT = false;
+        lastSTTValue = '';
         composer.classList.remove('stt-filling', 'stt-dimmed', 'stt-ready', 'stt-accumulating');
         syncPlaceholder();
         updateSendButtonState(); // FIX #9: Update send button state
         userSpeechStart = null;
+      } else {
+        // Brief acknowledgement or room blip: restore composer and finish pending question
+        userSpeechStart = null;
+        composer.classList.remove('stt-dimmed');
+        if (inputFromSTT && isLikelyCompleteQuestion(input.value)) {
+          armQuestionFinalizeTimer(settings && settings.autoAnswer ? 450 : 650, lastSTTChannel);
+        }
       }
     }, 800);
   }
@@ -1170,11 +1193,33 @@
       // Also clear the floating interim bar
       if (interimEl) { interimEl.textContent = ''; interimEl.classList.remove('show'); }
       transcriptInterimEl = null;
+      autoAnswerQueue.length = 0;
+      recentlyAnsweredQuestions.clear();
+      lastThemTranscript = { text: '', ts: 0 };
+      recentThemChunks.length = 0;
       clearTranscriptSidebar();
       // Only a question auto-filled from the transcript goes; anything the user typed stays.
       if (inputFromSTT) hardClearSTTFill();
       showToast('Transcript cleared.', 2500);
     });
+  }
+
+  function floatToPcm16WithAgc(f) {
+    const len = f.length;
+    let sumSq = 0;
+    for (let i = 0; i < len; i++) {
+      const s = Number.isFinite(f[i]) ? f[i] : 0;
+      sumSq += s * s;
+    }
+    const rms = Math.sqrt(sumSq / len);
+    const gain = (rms >= 0.0018 && rms < 0.09) ? Math.min(4.0, 0.09 / rms) : 1.0;
+    const out = new Int16Array(len);
+    for (let i = 0; i < len; i++) {
+      const raw = Number.isFinite(f[i]) ? f[i] : 0;
+      const s = Math.max(-1, Math.min(1, raw * gain));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out.buffer;
   }
 
   // ---- capture: mic (renderer side) — uses AudioWorklet (modern, off-main-thread) ----
@@ -1234,14 +1279,11 @@
         // Fallback to ScriptProcessor if AudioWorklet fails (shouldn't happen in Electron 33+)
         cue.log('AudioWorklet failed, falling back to ScriptProcessor: ' + workletErr.message);
         const micNode = audioCtx.createMediaStreamSource(micStream);
-        const micProc = audioCtx.createScriptProcessor(4096, 1, 1);
+        const micProc = audioCtx.createScriptProcessor(2048, 1, 1);
         const sink = audioCtx.createGain(); sink.gain.value = 0;
         micNode.connect(micProc); micProc.connect(sink); sink.connect(audioCtx.destination);
         micProc.onaudioprocess = (e) => {
-          const f = e.inputBuffer.getChannelData(0);
-          const out = new Int16Array(f.length);
-          for (let i = 0; i < f.length; i++) { const s = Math.max(-1, Math.min(1, f[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
-          cue.micPcm(out.buffer);
+          cue.micPcm(floatToPcm16WithAgc(e.inputBuffer.getChannelData(0)));
         };
         micWorklet = { _legacy: true, proc: micProc, node: micNode, sink };
       }
@@ -1335,14 +1377,11 @@
         // Fallback to ScriptProcessor
         cue.log('system audio AudioWorklet failed, using ScriptProcessor: ' + workletErr.message);
         const sysNode = sysCtx.createMediaStreamSource(new MediaStream(tracks));
-        const sysProc = sysCtx.createScriptProcessor(4096, 1, 1);
+        const sysProc = sysCtx.createScriptProcessor(2048, 1, 1);
         const sink = sysCtx.createGain(); sink.gain.value = 0;
         sysNode.connect(sysProc); sysProc.connect(sink); sink.connect(sysCtx.destination);
         sysProc.onaudioprocess = (e) => {
-          const f = e.inputBuffer.getChannelData(0);
-          const out = new Int16Array(f.length);
-          for (let i = 0; i < f.length; i++) { const s = Math.max(-1, Math.min(1, f[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
-          cue.systemPcm(out.buffer);
+          cue.systemPcm(floatToPcm16WithAgc(e.inputBuffer.getChannelData(0)));
         };
         sysWorklet = { _legacy: true, proc: sysProc, node: sysNode, sink };
       }
@@ -1585,12 +1624,18 @@
     // so that the getDisplayMedia request has a fresh user gesture.
     // Here we only start the mic (no gesture required) and stop everything on deactivate.
     if (active) {
+      vadSpeaking.you = false;
+      vadSpeaking.them = false;
+      questionFinalizeWaitCount = 0;
       startMic();
       if (!sysStream && !sysStarting) {
         try { startSystemAudio(); } catch (_) { /* handled inside startSystemAudio */ }
       }
       // Don't auto-open sidebar — user can toggle it manually
     } else {
+      vadSpeaking.you = false;
+      vadSpeaking.them = false;
+      questionFinalizeWaitCount = 0;
       stopMic();
       stopSystemAudio();
       // FIX #2: Clear interim element when capture stops
@@ -1689,6 +1734,9 @@
       vadSpeaking[channel] = !!speaking;
     }
     setLiveDotState(speaking ? 'speaking' : 'idle');
+    if (!speaking && questionFinalizeWaitCount > 0 && inputFromSTT && isLikelyCompleteQuestion(input.value)) {
+      armQuestionFinalizeTimer(300, lastSTTChannel);
+    }
   });
   cue.on('slides:update', ({ count, last }) => {
     if (!count) return;
@@ -1787,7 +1835,9 @@
       if (settings && settings.autoAnswer) {
         const isPendingFromThem = inputFromSTT && lastSTTChannel === 'them' && input.value.trim().length > 0;
         const looksLikeQuestion = isLikelyCompleteQuestion(trimmed) || /\?$/.test(trimmed);
-        if (looksLikeQuestion || (!isPendingFromThem && inputFromSTT && lastSTTChannel === 'you')) {
+        const continuingYou = !isPendingFromThem && inputFromSTT && lastSTTChannel === 'you';
+        const startingYouPreamble = !isPendingFromThem && !input.value.trim() && !busy && Date.now() - lastThemTranscript.ts > 8000;
+        if (looksLikeQuestion || continuingYou || startingYouPreamble) {
           cancelSoftClear();
           autoFillInputFromSTT(trimmed, 'you');
           return;
@@ -2103,6 +2153,13 @@
       settings.autoAnswer = !settings.autoAnswer;
       updateAutoAnswerButton(settings);
       await cue.settingsSet({ autoAnswer: settings.autoAnswer });
+      if (settings.autoAnswer) {
+        if (inputFromSTT && isLikelyCompleteQuestion(input.value)) {
+          enqueueAutoAnswerQuestions(input.value);
+        }
+      } else {
+        autoAnswerQueue.length = 0;
+      }
       showToast(settings.autoAnswer ? '⚡ Live Auto-Answer enabled' : 'Live Auto-Answer disabled', 1800);
     });
   }

@@ -693,7 +693,7 @@ function configForGeminiModel(targetModel, baseCfg, thinking) {
   return cfg;
 }
 
-async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, thinking, onToken, lengthCut, signal }) {
+async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, thinking, onToken, onActivity, lengthCut, signal }) {
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
   const contents = turns.map((t, i) => {
@@ -736,6 +736,7 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     stream = await tryGenerate(effectiveModel, configForGeminiModel(effectiveModel, baseConfig, thinking));
   } catch (e) {
     if (!isNotFoundError(e)) throw e;
+    if (effectiveModel !== model) resolvedGeminiFallbacks.delete(model);
     const fallbacks = ['2.5-flash', '2.0-flash', '1.5-flash'].map((v) => 'gemini-' + v).filter((m) => m !== model && m !== effectiveModel);
     let lastErr = e;
     for (const fb of fallbacks) {
@@ -760,6 +761,11 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     const t = chunk && chunk.text;
     if (t) answer.add(t);
     const candidate = chunk && Array.isArray(chunk.candidates) ? chunk.candidates[0] : null;
+    const parts = (candidate && candidate.content && Array.isArray(candidate.content.parts)) ? candidate.content.parts : [];
+    const hasThinking = !t && parts.some((p) => p && p.thought);
+    if (typeof onActivity === 'function') {
+      try { onActivity(t ? 'text' : hasThinking ? 'thinking' : 'other'); } catch { /* a watchdog hook must never break the answer */ }
+    }
     if (candidate && candidate.finishReason) stop = candidate.finishReason;
     else if (!stop && chunk && chunk.promptFeedback && chunk.promptFeedback.blockReason) stop = 'SAFETY';
   }
@@ -961,8 +967,8 @@ function createLLM(settings) {
       }
       // publik branches return an Error carrying `.action`; the string
       // branches keep working unchanged.
-      const wrap = (error, failedModel) => {
-        const wrapped = formatProviderErrorMessage(error, provider, failedModel);
+      const wrap = (error, failedModel, failedProvider = provider) => {
+        const wrapped = formatProviderErrorMessage(error, failedProvider, failedModel);
         return wrapped instanceof Error ? wrapped : new Error(wrapped);
       };
       if (provider === 'gemini' && !(args.signal && args.signal.aborted) && keys.groq && Date.now() < geminiQuotaCooldownUntil) {
@@ -970,7 +976,7 @@ function createLLM(settings) {
         try {
           return await streamGroq({ ...args, apiKey: keys.groq, model: groqFallbackModel });
         } catch (groqErr) {
-          throw wrap(groqErr, groqFallbackModel);
+          throw wrap(groqErr, groqFallbackModel, 'groq');
         }
       }
       try {

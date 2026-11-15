@@ -647,3 +647,356 @@ test('Renderer continuous multi-question queue, pause-wait, speaker echo guard, 
   assert.strictEqual(runModeCalls.length, 3);
   assert.strictEqual(runModeCalls[2].text, 'How would you design an LRU cache from scratch?');
 });
+
+test('Renderer fixes: lowercase split guard, brief-blip softClearSTTFill recovery, multi-clause you preamble, and AGC NaN safety', () => {
+  const vm = require('node:vm');
+  const src = fs.readFileSync(path.join(__dirname, '../renderer/renderer.js'), 'utf8');
+
+  const afStart = src.indexOf('// ========== SMART AUTO-FILL SYSTEM ==========');
+  const afEnd = src.indexOf("input.addEventListener('input'");
+  const autoFillSlice = src.slice(afStart, afEnd);
+
+  const vadStart = src.indexOf("cue.on('vad:state'");
+  const vadEnd = src.indexOf("cue.on('slides:update'");
+  const transcriptStart = src.indexOf("cue.on('transcript'");
+  const transcriptEnd = src.indexOf("cue.on('transcript:restore'");
+  const ipcSlice = src.slice(vadStart, vadEnd) + '\n' + src.slice(transcriptStart, transcriptEnd);
+
+  const agcStart = src.indexOf('  function floatToPcm16WithAgc(f)');
+  const agcEnd = src.indexOf('  // ---- capture: mic');
+  const agcSlice = src.slice(agcStart, agcEnd);
+
+  const stopClassList = { contains: (cls) => cls === 'active' };
+  const input = { value: '', style: { height: '' }, scrollHeight: 40 };
+  const classSet = new Set();
+  const composer = {
+    classList: {
+      add: (...cs) => cs.forEach((c) => classSet.add(c)),
+      remove: (...cs) => cs.forEach((c) => classSet.delete(c)),
+      contains: (c) => classSet.has(c)
+    }
+  };
+  const placeholder = { classList: { toggle: () => {} } };
+  const settings = { autoAnswer: true };
+  let busy = false;
+  const runModeCalls = [];
+
+  let now = 100000;
+  let nextTimerId = 1;
+  const timers = new Map();
+  const fakeSetTimeout = (fn, ms) => {
+    const id = nextTimerId++;
+    timers.set(id, { id, fn, at: now + (ms || 0) });
+    return id;
+  };
+  const fakeClearTimeout = (id) => {
+    if (id) timers.delete(id);
+  };
+  const advanceTimersBy = (ms) => {
+    const target = now + ms;
+    while (true) {
+      let earliest = null;
+      for (const t of timers.values()) {
+        if (t.at <= target && (!earliest || t.at < earliest.at)) earliest = t;
+      }
+      if (!earliest) break;
+      timers.delete(earliest.id);
+      now = earliest.at;
+      earliest.fn();
+    }
+    now = target;
+  };
+
+  const handlers = {};
+  const FakeDate = class extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return now; } };
+  const noopEl = { classList: { toggle: () => {}, add: () => {}, remove: () => {}, contains: () => false } };
+
+  const ctx = vm.createContext({
+    Date: FakeDate,
+    setTimeout: fakeSetTimeout,
+    clearTimeout: fakeClearTimeout,
+    Math,
+    Number,
+    Int16Array,
+    Map,
+    Set,
+    Array,
+    String,
+    Object,
+    RegExp,
+    Error,
+    isWindows: true,
+    busy,
+    lastSTTValue: '',
+    settings,
+    document: { activeElement: null, getElementById: () => noopEl },
+    $: (sel) => (sel === '#stop-btn' ? { classList: stopClassList } : noopEl),
+    cue: { on: (evt, cb) => { handlers[evt] = cb; } },
+    showToast: () => {},
+    syncPlaceholder: () => {},
+    expandPanel: () => {},
+    setBusy: (v) => { ctx.busy = v; },
+    runMode: (mode, text) => { ctx.busy = true; runModeCalls.push({ mode, text }); },
+    appendTranscriptHistoryTurn: () => {},
+    clearInputInterim: () => {},
+    setLiveDotState: () => {},
+    finalizeAi: () => {},
+    startAi: () => {},
+    showPublikCard: () => {},
+    showStatus: () => {},
+    publikActionButton: () => ({}),
+    input,
+    composer,
+    placeholder
+  });
+
+  vm.runInContext(
+    autoFillSlice + '\n' + ipcSlice + '\n' + agcSlice +
+    '\nthis.__api = { isLikelyCompleteQuestion, splitIntoQuestions, softClearSTTFill, autoFillInputFromSTT, floatToPcm16WithAgc, setBusyState: (v) => { busy = v; } };',
+    ctx
+  );
+
+  const api = ctx.__api;
+
+  // 1. No split on lowercase continuations after period or U.S.; keeps short ? follow-up distinct
+  assert.deepStrictEqual(
+    Array.from(api.splitIntoQuestions('We run U.S. Node.js. and then how do you scale it? Why Redis?')),
+    ['We run U.S. Node.js. and then how do you scale it?', 'Why Redis?']
+  );
+  assert.strictEqual(api.isLikelyCompleteQuestion('Why Redis?'), true);
+  assert.strictEqual(api.isLikelyCompleteQuestion('Walk us through your caching design'), true);
+
+  // 2. Brief mic blip (< 2000ms) during softClearSTTFill removes stt-dimmed and recovers finalization
+  handlers['transcript']({ channel: 'them', text: 'How do you handle backpressure in Kafka?' });
+  advanceTimersBy(200);
+  api.softClearSTTFill();
+  assert.strictEqual(composer.classList.contains('stt-dimmed'), true);
+  advanceTimersBy(850); // 800ms soft-clear timer fires at ~800ms < 2000ms
+  assert.strictEqual(composer.classList.contains('stt-dimmed'), false, 'brief mic blip must un-dim composer');
+  advanceTimersBy(600); // recovered armQuestionFinalizeTimer completes
+  assert.strictEqual(runModeCalls.length, 1);
+  assert.strictEqual(runModeCalls[0].text, 'How do you handle backpressure in Kafka?');
+
+  api.setBusyState(false);
+  now += 15000; // exceed 8s lastThemTranscript window (single-mic interview test scenario)
+
+  // 3. Multi-clause 'you' preamble without '?' accumulates and completes as one question
+  handlers['transcript']({ channel: 'you', text: 'Imagine traffic spikes 10x overnight.' });
+  advanceTimersBy(600);
+  handlers['transcript']({ channel: 'you', text: 'How would you autoscale the cluster?' });
+  advanceTimersBy(1500);
+  assert.strictEqual(runModeCalls.length, 2);
+  assert.strictEqual(runModeCalls[1].text, 'Imagine traffic spikes 10x overnight. How would you autoscale the cluster?');
+
+  // 4. Non-question 'you' chatter clears cleanly after idle timeout without firing LLM
+  api.setBusyState(false);
+  handlers['transcript']({ channel: 'you', text: 'At my previous company we migrated slowly.' });
+  advanceTimersBy(5000);
+  assert.strictEqual(runModeCalls.length, 2);
+  assert.strictEqual(input.value, '');
+
+  // 5. ScriptProcessor fallback AGC helper survives NaN/Infinity without poisoning buffer
+  const noisy = new Float32Array(2048).fill(0.02);
+  noisy[0] = NaN;
+  noisy[1] = Infinity;
+  const pcmBuf = api.floatToPcm16WithAgc(noisy);
+  const pcmSamples = new Int16Array(pcmBuf);
+  assert.strictEqual(pcmSamples[0], 0);
+  assert.strictEqual(pcmSamples[1], 0);
+  assert.ok(pcmSamples[10] > 2000, 'non-NaN quiet samples still receive positive AGC boost');
+});
+
+test('Gemini emits onActivity for thinking/text, evicts dead cached fallback, and attributes cooldown Groq errors to Groq', async () => {
+  const genaiPath = require.resolve('@google/genai');
+  const openaiPath = require.resolve('openai');
+  const llmPath = require.resolve('../src/llm');
+  const origGenai = require.cache[genaiPath];
+  const origOpenai = require.cache[openaiPath];
+  const origLlm = require.cache[llmPath];
+
+  let geminiScenario = 'ok';
+  let groqErrorToThrow = null;
+
+  class FakeGoogleGenAI {
+    constructor() {
+      this.models = {
+        generateContentStream: async ({ model }) => {
+          if (geminiScenario === 'primary-404' && model !== 'gemini-' + '2.5-flash') {
+            const err = new Error('404 Not Found');
+            err.status = 404;
+            throw err;
+          }
+          if (geminiScenario === 'all-404') {
+            const err = new Error('404 Not Found');
+            err.status = 404;
+            throw err;
+          }
+          if (geminiScenario === 'quota-429') {
+            const err = new Error('429 You exceeded your current quota');
+            err.status = 429;
+            throw err;
+          }
+          return (async function* () {
+            yield { text: '', candidates: [{ content: { parts: [{ thought: true, text: 'reasoning...' }] } }] };
+            yield { text: 'Answer body', candidates: [{ content: { parts: [{ text: 'Answer body' }] }, finishReason: 'STOP' }] };
+          })();
+        }
+      };
+    }
+  }
+
+  class FakeOpenAI {
+    constructor() {
+      this.chat = {
+        completions: {
+          create: async () => {
+            if (groqErrorToThrow) throw groqErrorToThrow;
+            return (async function* () {
+              yield { choices: [{ delta: { content: 'Groq ok' }, finish_reason: 'stop' }] };
+            })();
+          }
+        }
+      };
+    }
+  }
+
+  require.cache[genaiPath] = { id: genaiPath, filename: genaiPath, loaded: true, exports: { GoogleGenAI: FakeGoogleGenAI } };
+  require.cache[openaiPath] = { id: openaiPath, filename: openaiPath, loaded: true, exports: FakeOpenAI };
+  delete require.cache[llmPath];
+
+  try {
+    const { createLLM, CURRENT_GEMINI_DEFAULT, _resetGeminiRuntimeState, _getGeminiRuntimeState } = require('../src/llm');
+    _resetGeminiRuntimeState();
+
+    const activities = [];
+    const llm = createLLM({
+      provider: 'gemini',
+      apiKeys: { gemini: 'gm-test', groq: 'gsk-test' },
+      models: { gemini: { fast: CURRENT_GEMINI_DEFAULT } },
+      smart: true
+    });
+    const out = await llm.stream({
+      system: 'sys',
+      turns: [{ role: 'user', text: 'hi' }],
+      onToken: () => {},
+      onActivity: (kind) => activities.push(kind)
+    });
+    assert.strictEqual(out, 'Answer body');
+    assert.deepStrictEqual(activities, ['thinking', 'text']);
+
+    // Cache fallback on primary 404, then verify dead cached fallback gets evicted if it later 404s
+    const llmNoGroq = createLLM({
+      provider: 'gemini',
+      apiKeys: { gemini: 'gm-test' },
+      models: { gemini: { fast: CURRENT_GEMINI_DEFAULT } }
+    });
+    geminiScenario = 'primary-404';
+    const fbOut = await llmNoGroq.stream({ system: 'sys', turns: [{ role: 'user', text: 'hi' }], onToken: () => {} });
+    assert.strictEqual(fbOut, 'Answer body');
+    assert.strictEqual(_getGeminiRuntimeState().resolvedGeminiFallbacks.get(CURRENT_GEMINI_DEFAULT), 'gemini-' + '2.5-flash');
+
+    geminiScenario = 'all-404';
+    await assert.rejects(() => llmNoGroq.stream({ system: 'sys', turns: [{ role: 'user', text: 'hi' }], onToken: () => {} }));
+    assert.strictEqual(_getGeminiRuntimeState().resolvedGeminiFallbacks.has(CURRENT_GEMINI_DEFAULT), false, 'dead cached fallback must be evicted on 404');
+    geminiScenario = 'ok';
+    _resetGeminiRuntimeState();
+
+    // Put Gemini into quota cooldown with no Groq fallback working during cooldown -> error must name Groq, not Gemini
+    geminiScenario = 'quota-429';
+    groqErrorToThrow = Object.assign(new Error('401 Invalid API Key'), { status: 401 });
+    // First call hits 429 on Gemini, tries Groq (throws), propagates Gemini error, AND activates cooldown
+    await assert.rejects(() => llm.stream({ system: 'sys', turns: [{ role: 'user', text: 'hi' }], onToken: () => {} }));
+    assert.ok(_getGeminiRuntimeState().geminiQuotaCooldownUntil > Date.now());
+    // Second call skips Gemini straight to Groq; when Groq throws 401, error must attribute to Groq, not Gemini
+    await assert.rejects(
+      () => llm.stream({ system: 'sys', turns: [{ role: 'user', text: 'hi' }], onToken: () => {} }),
+      (err) => /Groq/i.test(err.message) && !/Gemini/i.test(err.message)
+    );
+
+    _resetGeminiRuntimeState();
+  } finally {
+    if (origGenai) require.cache[genaiPath] = origGenai; else delete require.cache[genaiPath];
+    if (origOpenai) require.cache[openaiPath] = origOpenai; else delete require.cache[openaiPath];
+    if (origLlm) require.cache[llmPath] = origLlm; else delete require.cache[llmPath];
+  }
+});
+
+test('STT hallucination filter drops Whisper tags and shared multi-provider cooldown persists across flushChannel calls', async () => {
+  const openaiPath = require.resolve('openai');
+  const genaiPath = require.resolve('@google/genai');
+  const sttPath = require.resolve('../src/stt');
+  const origOpenai = require.cache[openaiPath];
+  const origGenai = require.cache[genaiPath];
+  const origStt = require.cache[sttPath];
+
+  let groqCalls = 0;
+  let geminiCalls = 0;
+
+  class FakeOpenAI {
+    constructor() {
+      this.audio = {
+        transcriptions: {
+          create: async () => {
+            groqCalls++;
+            const err = new Error('429 Too Many Requests');
+            err.status = 429;
+            throw err;
+          }
+        }
+      };
+    }
+  }
+  FakeOpenAI.toFile = async (buf, name) => ({ buf, name });
+
+  class FakeGoogleGenAI {
+    constructor() {
+      this.models = {
+        generateContent: async () => {
+          geminiCalls++;
+          return { candidates: [{ content: { parts: [{ audioTranscription: { text: 'gemini fallback transcript' } }] } }] };
+        }
+      };
+    }
+  }
+
+  require.cache[openaiPath] = { id: openaiPath, filename: openaiPath, loaded: true, exports: FakeOpenAI };
+  require.cache[genaiPath] = { id: genaiPath, filename: genaiPath, loaded: true, exports: { GoogleGenAI: FakeGoogleGenAI } };
+  delete require.cache[sttPath];
+
+  try {
+    const { createSTT, looksLikeHallucination, _resetSttCooldowns } = require('../src/stt');
+    _resetSttCooldowns();
+
+    assert.strictEqual(looksLikeHallucination('[BLANK_AUDIO]'), true);
+    assert.strictEqual(looksLikeHallucination('(silence)'), true);
+    assert.strictEqual(looksLikeHallucination('(music)'), true);
+    assert.strictEqual(looksLikeHallucination('Tell me about Kubernetes.'), false);
+
+    const settings = { sttProvider: 'auto', apiKeys: { groq: 'gsk-rate-limited', gemini: 'gm-healthy' } };
+    const pcm = Buffer.alloc(6400);
+
+    // Tick 1: Groq hits 429 and falls back to Gemini
+    const r1 = await createSTT(settings).transcribe(pcm, { context: 'Previous sentence.' });
+    assert.strictEqual(r1.provider, 'gemini');
+    assert.strictEqual(r1.text, 'Gemini fallback transcript');
+    assert.strictEqual(groqCalls, 1);
+    assert.strictEqual(geminiCalls, 1);
+
+    // Tick 2 (new createSTT instance as in flushChannel): Groq is skipped cleanly in cooldown, straight to Gemini
+    const r2 = await createSTT(settings).transcribe(pcm);
+    assert.strictEqual(r2.provider, 'gemini');
+    assert.strictEqual(groqCalls, 1, 'second flushChannel tick must skip cooled-down Groq while Gemini is healthy');
+    assert.strictEqual(geminiCalls, 2);
+
+    // Changing Groq key invalidates the cooldown key immediately
+    const r3 = await createSTT({ sttProvider: 'auto', apiKeys: { groq: 'gsk-brand-new-key', gemini: 'gm-healthy' } }).transcribe(pcm);
+    assert.strictEqual(r3.provider, 'gemini');
+    assert.strictEqual(groqCalls, 2, 'updated API key must bypass stale key cooldown');
+
+    _resetSttCooldowns();
+  } finally {
+    if (origOpenai) require.cache[openaiPath] = origOpenai; else delete require.cache[openaiPath];
+    if (origGenai) require.cache[genaiPath] = origGenai; else delete require.cache[genaiPath];
+    if (origStt) require.cache[sttPath] = origStt; else delete require.cache[sttPath];
+  }
+});

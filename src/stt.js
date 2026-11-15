@@ -14,10 +14,13 @@ function looksLikeHallucination(raw) {
   const trimmed = (raw || '').trim();
   if (!trimmed) return true;
   if (/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+$/u.test(trimmed)) return true;
+  if (/^\[(?:blank[_ ]?audio|silence|inaudible|no[_ ]?speech|music|applause|laughter|crosstalk)\]$/i.test(trimmed)) return true;
+  if (/^\((?:silence|inaudible|no[_ ]?speech|music|applause|laughter|sighs?)\)$/i.test(trimmed)) return true;
   const t = trimmed.replace(/[.,!?…]+$/g, '').trim().toLowerCase();
   const artifacts = new Set([
     'thank you', 'thank you very much', 'thank you for watching', 'thanks for watching',
-    'please subscribe', 'like and subscribe', 'bye-bye', 'bye bye', 'bye', 'you', 'okay'
+    'please subscribe', 'like and subscribe', 'bye-bye', 'bye bye', 'bye', 'you', 'okay',
+    'subtitles by the amara.org community', 'amara.org'
   ]);
   return artifacts.has(t);
 }
@@ -70,8 +73,26 @@ function extractGeminiTranscript(res) {
 const TRANSCRIBE_MODEL_COOLDOWN_MS = 60000;
 let transcribeModelDownUntil = 0;
 
+// Shared per-key provider cooldowns so multi-provider chains created on every
+// flushChannel tick skip a rate-limited primary (e.g. Groq 429) while another
+// healthy fallback exists, without blocking single-provider retry semantics.
+const sharedProviderCooldowns = new Map();
+function sttCooldownKey(provider, key, extra = '') {
+  const raw = `${provider}|${extra}|${key || ''}`;
+  let h = 2166136261;
+  for (let i = 0; i < raw.length; i++) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `${provider}:${(h >>> 0).toString(36)}`;
+}
+function _resetSttCooldowns() {
+  sharedProviderCooldowns.clear();
+  transcribeModelDownUntil = 0;
+}
+
 // Split from transcribeGemini so tests can pass a fake client.
-async function transcribeGeminiWith(ai, wav, now = Date.now()) {
+async function transcribeGeminiWith(ai, wav, now = Date.now(), opts = {}) {
   const audio = { inlineData: { mimeType: 'audio/wav', data: wav.toString('base64') } };
   if (now >= transcribeModelDownUntil) {
     try {
@@ -89,8 +110,12 @@ async function transcribeGeminiWith(ai, wav, now = Date.now()) {
       transcribeModelDownUntil = now + TRANSCRIBE_MODEL_COOLDOWN_MS;
     }
   }
+  const instruction = ['Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.'];
+  const ctxTail = opts && opts.context ? contextTail(opts.context) : '';
+  if (ctxTail) instruction.push(`Previous spoken words before this clip: ${ctxTail}`);
+  else if (opts && opts.prompt) instruction.push(`Domain terms that may appear: ${String(opts.prompt).slice(0, 400)}`);
   const promptContents = [{ role: 'user', parts: [
-    { text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.' },
+    { text: instruction.join('\n') },
     audio
   ] }];
   try {
@@ -116,9 +141,9 @@ async function transcribeGeminiWith(ai, wav, now = Date.now()) {
   }
 }
 
-async function transcribeGemini(apiKey, wav) {
+async function transcribeGemini(apiKey, wav, opts = {}) {
   const { GoogleGenAI } = require('@google/genai');
-  return transcribeGeminiWith(new GoogleGenAI({ apiKey }), wav);
+  return transcribeGeminiWith(new GoogleGenAI({ apiKey }), wav, Date.now(), opts);
 }
 
 // whisper-1 answers in verbose_json with the clip's real duration, so the
@@ -224,7 +249,7 @@ function createSTT(settings) {
   // Groq Whisper (free, high-speed whisper-large-v3-turbo) — preferred default for own-key / auto
   if ((ownAuto || isGroq) && keys.groq) {
     const model = 'whisper-large-v3-turbo';
-    chain.push({ p: 'groq', m: model, fn: async (wav, opts) => {
+    chain.push({ p: 'groq', m: model, ck: sttCooldownKey('groq', keys.groq), fn: async (wav, opts) => {
       const context = opts && opts.context;
       const text = await transcribeOpenAI(keys.groq, wav, model, 'https://api.groq.com/openai/v1', promptWithContext(vocabPrompt, context));
       return context ? continuedText(text, context) : text;
@@ -233,13 +258,17 @@ function createSTT(settings) {
   // Gemini as cloud failover / direct selection
   if ((ownAuto || isGroq || selectedProvider === 'gemini') && keys.gemini) {
     const model = resolveGeminiModel(settings);
-    chain.push({ p: 'gemini', m: model, fn: (wav) => transcribeGemini(keys.gemini, wav) });
+    chain.push({ p: 'gemini', m: model, ck: sttCooldownKey('gemini', keys.gemini), fn: async (wav, opts) => {
+      const context = opts && opts.context;
+      const text = await transcribeGemini(keys.gemini, wav, { context, prompt: vocabPrompt });
+      return context ? continuedText(text, context) : text;
+    } });
   }
   // Each entry carries the model id it actually sends, so a failure can name
   // that id back to the user instead of a hardcoded one they never picked.
   if ((ownAuto || selectedProvider === 'openai') && keys.openai) {
     const model = settings.sttModel || 'whisper-1';
-    chain.push({ p: 'openai', m: model, fn: async (wav, opts) => {
+    chain.push({ p: 'openai', m: model, ck: sttCooldownKey('openai', keys.openai), fn: async (wav, opts) => {
       const context = opts && opts.context;
       const text = await transcribeOpenAI(keys.openai, wav, model, undefined, promptWithContext(vocabPrompt, context));
       return context ? continuedText(text, context) : text;
@@ -251,7 +280,7 @@ function createSTT(settings) {
   // the audio-transcription API at all, so this only fires on an explicit
   // choice, and only once both the URL and the key it needs are actually set.
   if (selectedProvider === 'custom' && keys.custom && settings.baseUrl) {
-    chain.push({ p: 'custom', fn: async (wav, opts) => {
+    chain.push({ p: 'custom', ck: sttCooldownKey('custom', keys.custom, settings.baseUrl), fn: async (wav, opts) => {
       const context = opts && opts.context;
       const text = await transcribeOpenAI(keys.custom, wav, settings.sttModel, settings.baseUrl, promptWithContext(vocabPrompt, context));
       return context ? continuedText(text, context) : text;
@@ -265,7 +294,7 @@ function createSTT(settings) {
   // person who moved to another provider is never charged on publik for audio.
   const publikStt = publikTranscription(settings);
   if (selectedProvider === 'auto' && publikStt) {
-    chain.push({ p: 'publik', m: publikStt.model, fn: async (wav, opts) => {
+    chain.push({ p: 'publik', m: publikStt.model, ck: sttCooldownKey('publik', publikStt.apiKey, publikStt.baseURL), fn: async (wav, opts) => {
       const context = opts && opts.context;
       const text = await transcribeOpenAI(publikStt.apiKey, wav, publikStt.model, publikStt.baseURL, promptWithContext(vocabPrompt, context), PUBLIK_STT_CLIENT);
       return context ? continuedText(text, context) : text;
@@ -291,10 +320,18 @@ function createSTT(settings) {
       let anyAttempted = false;
       for (const c of chain) {
         if (providerCooldowns[c.p] && now < providerCooldowns[c.p]) continue;
+        const sharedUntil = c.ck ? (sharedProviderCooldowns.get(c.ck) || 0) : 0;
+        if (sharedUntil > now) {
+          const hasHealthyAlt = chain.some((other) => other !== c
+            && !(providerCooldowns[other.p] && now < providerCooldowns[other.p])
+            && now >= (other.ck ? (sharedProviderCooldowns.get(other.ck) || 0) : 0));
+          if (hasHealthyAlt) continue;
+        }
         anyAttempted = true;
         try {
           const text = await c.fn(wav, opts);
           delete providerCooldowns[c.p];
+          if (c.ck) sharedProviderCooldowns.delete(c.ck);
           disabledUntil = 0;
           lastProvider = c.p;
           if (looksLikeHallucination(text)) return { text: '', provider: c.p };
@@ -319,6 +356,7 @@ function createSTT(settings) {
           if (backOff) {
             const cooldown = (retryAfterMs && retryAfterMs > 0) ? retryAfterMs : 30000;
             providerCooldowns[c.p] = now + cooldown;
+            if (c.ck && chain.length > 1) sharedProviderCooldowns.set(c.ck, now + cooldown);
             lastProvider = c.p;
             // When multiple providers exist in the chain (e.g. Groq with Gemini failover),
             // continue down the chain to try the remaining provider instead of aborting.
@@ -338,4 +376,4 @@ function createSTT(settings) {
   };
 }
 
-module.exports = { createSTT, publikTranscription, publikOwnsAutoAudio, PUBLIK_STT_MODEL, PUBLIK_STT_CLIENT, retryAfterHeaderMs, promptWithContext, continuedText, CONTEXT_CHARS, looksLikeHallucination, buildVocabPrompt, transcribeGemini, transcribeGeminiWith, extractGeminiTranscript };
+module.exports = { createSTT, publikTranscription, publikOwnsAutoAudio, PUBLIK_STT_MODEL, PUBLIK_STT_CLIENT, retryAfterHeaderMs, promptWithContext, continuedText, CONTEXT_CHARS, looksLikeHallucination, buildVocabPrompt, transcribeGemini, transcribeGeminiWith, extractGeminiTranscript, _resetSttCooldowns };
