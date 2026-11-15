@@ -43,6 +43,12 @@ const DEFAULT_MODELS = {
   azure: 'gpt-4o-mini',
   publik: publik.DEFAULT_MODELS.fast
 };
+const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_VISION_FALLBACK_MODELS = [
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+];
+const GROQ_VISION_CAPABLE_RE = /llama-4-(?:scout|maverick)|vision|llava/i;
 const CEREBRAS_BASE_URL = 'https://api.cerebras.ai/v1';
 
 // Gemini model ids that Google has since deprecated/retired (the 2.5 family
@@ -664,6 +670,10 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
 // (thinkingBudget: 0 is rejected by pro models and "minimal" by flash, so
 // "low" is the one setting that works across the family.)
 const GEMINI_THINKING_HEADROOM = { fast: 1024, smart: 4096 };
+const resolvedGeminiFallbacks = new Map();
+let geminiQuotaCooldownUntil = 0;
+const GEMINI_QUOTA_COOLDOWN_MS = 60000;
+
 function geminiGenerationConfig({ system, maxTokens, thinking }) {
   const config = {
     systemInstruction: system,
@@ -671,6 +681,16 @@ function geminiGenerationConfig({ system, maxTokens, thinking }) {
   };
   if (!thinking) config.thinkingConfig = { thinkingLevel: 'low' };
   return config;
+}
+
+function configForGeminiModel(targetModel, baseCfg, thinking) {
+  const cfg = { ...baseCfg };
+  if (/^gemini-2\.5/i.test(targetModel || '')) {
+    cfg.thinkingConfig = { thinkingBudget: thinking ? 512 : 0 };
+  } else if (/^gemini-(?:2\.0|1\.5)/i.test(targetModel || '')) {
+    delete cfg.thinkingConfig;
+  }
+  return cfg;
 }
 
 async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, thinking, onToken, lengthCut, signal }) {
@@ -685,14 +705,26 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     }
     return { role: t.role === 'assistant' ? 'model' : 'user', parts };
   });
-  const config = geminiGenerationConfig({ system, maxTokens, thinking });
-  if (signal) config.abortSignal = signal;
+  const baseConfig = geminiGenerationConfig({ system, maxTokens, thinking });
+  if (signal) baseConfig.abortSignal = signal;
+  const effectiveModel = resolvedGeminiFallbacks.get(model) || model;
   let stream;
   const tryGenerate = async (targetModel, cfg) => {
     try {
       return await ai.models.generateContentStream({ model: targetModel, contents, config: cfg });
     } catch (e) {
       if (cfg.thinkingConfig && /thinking/i.test((e && e.message) || '')) {
+        if (cfg.thinkingConfig.thinkingBudget === undefined) {
+          try {
+            return await ai.models.generateContentStream({
+              model: targetModel,
+              contents,
+              config: { ...cfg, thinkingConfig: { thinkingBudget: thinking ? 512 : 0 } }
+            });
+          } catch (budgetErr) {
+            if (!/thinking/i.test((budgetErr && budgetErr.message) || '')) throw budgetErr;
+          }
+        }
         const nextCfg = { ...cfg };
         delete nextCfg.thinkingConfig;
         return await ai.models.generateContentStream({ model: targetModel, contents, config: nextCfg });
@@ -701,16 +733,15 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     }
   };
   try {
-    stream = await tryGenerate(model, config);
+    stream = await tryGenerate(effectiveModel, configForGeminiModel(effectiveModel, baseConfig, thinking));
   } catch (e) {
     if (!isNotFoundError(e)) throw e;
-    const fallbacks = ['2.5-flash', '2.0-flash', '1.5-flash'].map((v) => 'gemini-' + v).filter((m) => m !== model);
+    const fallbacks = ['2.5-flash', '2.0-flash', '1.5-flash'].map((v) => 'gemini-' + v).filter((m) => m !== model && m !== effectiveModel);
     let lastErr = e;
     for (const fb of fallbacks) {
       try {
-        const fbCfg = { ...config };
-        delete fbCfg.thinkingConfig;
-        stream = await tryGenerate(fb, fbCfg);
+        stream = await tryGenerate(fb, configForGeminiModel(fb, baseConfig, thinking));
+        resolvedGeminiFallbacks.set(model, fb);
         lastErr = null;
         break;
       } catch (fbErr) {
@@ -903,7 +934,9 @@ function createLLM(settings) {
   // LinkedIn page, from ~20-40 image tokens, while publik-balanced read it
   // right). A question that carries a screenshot goes to the smart alias;
   // text-only questions stay on the fast tier.
-  const visionModel = provider === PUBLIK_PROVIDER ? publikVisionModel(settings, model) : model;
+  const visionModel = provider === PUBLIK_PROVIDER
+    ? publikVisionModel(settings, model)
+    : (provider === 'groq' && !GROQ_VISION_CAPABLE_RE.test(model || '') ? GROQ_VISION_MODEL : model);
 
   return {
     provider, model, visionModel, apiKey, baseURL,
@@ -932,13 +965,31 @@ function createLLM(settings) {
         const wrapped = formatProviderErrorMessage(error, provider, failedModel);
         return wrapped instanceof Error ? wrapped : new Error(wrapped);
       };
+      if (provider === 'gemini' && !(args.signal && args.signal.aborted) && keys.groq && Date.now() < geminiQuotaCooldownUntil) {
+        const groqFallbackModel = args.imageDataUrl ? GROQ_VISION_MODEL : 'llama-3.3-70b-versatile';
+        try {
+          return await streamGroq({ ...args, apiKey: keys.groq, model: groqFallbackModel });
+        } catch (groqErr) {
+          throw wrap(groqErr, groqFallbackModel);
+        }
+      }
       try {
         return await streamWith(provider, args, minimaxRegion);
       } catch (error) {
-        if (provider === 'gemini' && (error && (error.status === 402 || error.status === 429 || /402|429|quota|credit|depleted/i.test(error.message || ''))) && keys.groq) {
-          const groqFallbackModel = 'qwen/qwen3.8-27b';
+        if (provider === 'gemini' && !(args.signal && args.signal.aborted)) {
+          if (isQuotaError(error) || isRateLimitError(error)) {
+            geminiQuotaCooldownUntil = Date.now() + GEMINI_QUOTA_COOLDOWN_MS;
+          }
+          if (keys.groq) {
+            const groqFallbackModel = args.imageDataUrl ? GROQ_VISION_MODEL : 'llama-3.3-70b-versatile';
+            try {
+              return await streamGroq({ ...args, apiKey: keys.groq, model: groqFallbackModel });
+            } catch (_) { /* fall through to original error */ }
+          }
+        }
+        if (provider === 'groq' && !(args.signal && args.signal.aborted) && keys.gemini) {
           try {
-            return await streamGroq({ ...args, apiKey: keys.groq, model: groqFallbackModel });
+            return await streamGemini({ ...args, apiKey: keys.gemini, model: CURRENT_GEMINI_DEFAULT });
           } catch (_) { /* fall through to original error */ }
         }
         const retryModel = provider === PUBLIK_PROVIDER ? publikRefusalRetryModel(error, useModel, settings, !!args.imageDataUrl) : '';
@@ -966,15 +1017,17 @@ async function streamGroq(args) {
     return await streamOpenAI({ ...args, baseURL: 'https://api.groq.com/openai/v1' });
   } catch (e) {
     const msg = (e && e.message) || '';
-    const isModelOrVisionErr = isNotFoundError(e) || (e && e.status === 400 && /content must be a string|model|decommissioned|image/i.test(msg));
+    const isModelOrVisionErr = isNotFoundError(e) || (e && (e.status === 400 || e.status === 429) && /content must be a string|model|decommissioned|image|rate_limit|429/i.test(msg));
     if (!isModelOrVisionErr) throw e;
-    const fallbacks = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    const fallbacks = args.imageDataUrl
+      ? [...GROQ_VISION_FALLBACK_MODELS.filter((m) => m !== args.model), 'llama-3.3-70b-versatile', 'qwen/qwen3.8-27b']
+      : ['llama-3.3-70b-versatile', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
     for (const fb of fallbacks) {
+      const nextArgs = { ...args, model: fb, baseURL: 'https://api.groq.com/openai/v1' };
+      if (args.imageDataUrl && !GROQ_VISION_CAPABLE_RE.test(fb)) {
+        delete nextArgs.imageDataUrl;
+      }
       try {
-        const nextArgs = { ...args, model: fb, baseURL: 'https://api.groq.com/openai/v1' };
-        if (e && e.status === 400 && /content must be a string|image/i.test(msg)) {
-          delete nextArgs.imageDataUrl;
-        }
         return await streamOpenAI(nextArgs);
       } catch (fbErr) {
         if (fbErr && fbErr.status === 400 && nextArgs.imageDataUrl) {
@@ -984,7 +1037,7 @@ async function streamGroq(args) {
             return await streamOpenAI(textOnlyArgs);
           } catch (_) {}
         }
-        if (!isNotFoundError(fbErr) && !(fbErr && fbErr.status === 400)) throw fbErr;
+        if (!isNotFoundError(fbErr) && !(fbErr && fbErr.status === 400) && !(fbErr && fbErr.status === 429)) throw fbErr;
       }
     }
     throw e;
@@ -1053,5 +1106,12 @@ module.exports = {
   CURRENT_ANTHROPIC_DEFAULT_FAST,
   CURRENT_ANTHROPIC_DEFAULT_SMART,
   PUBLIK_PROVIDER,
-  isRateLimitError
+  isRateLimitError,
+  _resetGeminiRuntimeState() {
+    resolvedGeminiFallbacks.clear();
+    geminiQuotaCooldownUntil = 0;
+  },
+  _getGeminiRuntimeState() {
+    return { resolvedGeminiFallbacks, geminiQuotaCooldownUntil };
+  }
 };

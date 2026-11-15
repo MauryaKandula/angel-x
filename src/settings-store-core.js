@@ -39,7 +39,9 @@ function createFileStore(resolveUserDataDir, label) {
   const bakPath = () => mainPath() + '.bak';
 
   function readJson(candidate) {
-    return JSON.parse(fs.readFileSync(candidate, 'utf8'));
+    let raw = fs.readFileSync(candidate, 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    return JSON.parse(raw);
   }
 
   function chmodQuiet(target) {

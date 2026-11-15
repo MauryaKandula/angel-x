@@ -99,3 +99,15 @@ test('persist() throws rather than swallowing a failure, so a caller can surface
   const fileStore = createFileStore(() => missingDir, 'cue-data.json');
   assert.throws(() => fileStore.persist({ smart: true }), /ENOENT/);
 });
+
+test('load() cleanly parses files containing a UTF-8 BOM without falling back to backup or failing', (t) => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'cue-data.json');
+  // Prepend UTF-8 BOM \uFEFF to valid JSON
+  fs.writeFileSync(file, '\uFEFF{"provider":"gemini","sttProvider":"groq"}', 'utf8');
+  const fileStore = createFileStore(() => dir, 'cue-data.json');
+  const loaded = fileStore.load();
+  assert.ok(loaded);
+  assert.equal(loaded.recoveredFromBackup, false);
+  assert.equal(loaded.data.sttProvider, 'groq');
+});

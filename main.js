@@ -273,7 +273,7 @@ async function getWhisperOverview() {
 // The window has a transparent, click-through strip on each side of the main column so
 // the history sidebar can slide out left or right. Must match --main-w/--side-w in
 // styles.css. Saved windowX is the main column's x, not the window's.
-const MAIN_W = 700, SIDE_W = 300, BAR_H = 75;
+const MAIN_W = 880, SIDE_W = 300, BAR_H = 78;
 let isPanelCollapsed = true;
 
 function saveWindowPosition() {
@@ -286,7 +286,7 @@ function saveWindowPosition() {
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
   const savedSettings = store.getSettings();
-  const currentPanelW = Math.max(680, savedSettings.panelWidth || MAIN_W);
+  const currentPanelW = Math.max(820, savedSettings.panelWidth || MAIN_W);
   const currentH = Math.max(640, savedSettings.panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const isStartCollapsed = savedSettings.startCollapsed !== false || savedSettings.compactMode;
@@ -322,7 +322,7 @@ function createWindow() {
     transparent: true,
     hasShadow: false,
     resizable: true,
-    skipTaskbar: false,
+    skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
     title: 'Angel X',
@@ -337,6 +337,7 @@ function createWindow() {
   };
 
   win = new BrowserWindow(winOptions);
+  win.setSkipTaskbar(true);
 
   const shouldProtect = !process.env.CUE_NO_PROTECT && (savedSettings.screenProtection !== false);
   if (shouldProtect) {
@@ -428,15 +429,10 @@ async function flushChannel(channel) {
   const settings = store.getSettings();
   const stt = createSTT(settings);
   const viaPublik = stt.providers[0] === publik.PUBLIK_PROVIDER;
-  // Another provider: the audio waits in the buffer while a request is in
-  // flight and goes out with the next window.
-  if (busy && !viaPublik) return;
   const chunks = buffers[channel];
   buffers[channel] = [];
   const windowPcm = chunks.length ? Buffer.concat(chunks) : null;
-  // silence gate: a window that is too short or too quiet is not speech
-  const voiced = windowPcm && windowPcm.length >= MIN_BYTES && rms16(windowPcm) >= RMS_GATE ? windowPcm : null;
-  let pcm = voiced;
+  let pcm = null;
   if (viaPublik) {
     // publik API: whole utterances cut at pauses, so two busy channels stay
     // under the key's 60 requests a minute and a question is never cut inside
@@ -450,13 +446,16 @@ async function flushChannel(channel) {
     if (busy) { publikSttBatchers[channel].feed(windowPcm); return; }
     pcm = publikSttBatchers[channel].push(windowPcm);
   } else {
-    publikSttBatchers[channel].reset();
+    // Route Groq, Gemini, OpenAI, and Custom through UtteranceBatcher too so
+    // continuous speech is segmented cleanly at pauses without mid-word cuts or
+    // exhausting free-tier RPM limits across mic + system audio.
+    if (busy) { publikSttBatchers[channel].feed(windowPcm); return; }
+    pcm = publikSttBatchers[channel].push(windowPcm);
   }
   if (!pcm) return;
-  // After publik refused for good (balance used up, a refused request), do
-  // not send every utterance again; listening resumes on the next start or
-  // a Settings save, which clear sttDisabled.
-  if (sttDisabled && stt.providers[0] === publik.PUBLIK_PROVIDER) return;
+  // After a permanent refusal (balance used up, bad key), stop sending until
+  // listening is restarted or Settings are saved.
+  if (sttDisabled) return;
 
   const session = sttSession;
   // A piece that starts at a cut goes with the text before it, so whisper
@@ -492,9 +491,10 @@ function sttRetryDelayMs(err) {
 function lostAudioReason(err) {
   if (!err) return '';
   if (err === NEW_SESSION_FIRST) return 'a new session started first';
-  if (err.status === 429) return 'publik API was busy';
-  if (err.status >= 500) return 'publik API had a server error';
-  if (!err.status) return 'publik API did not answer in time';
+  const name = (!err.provider || err.provider === 'publik') ? 'publik API' : err.provider;
+  if (err.status === 429) return `${name} was busy`;
+  if (err.status >= 500) return `${name} had a server error`;
+  if (!err.status) return `${name} did not answer in time`;
   return String(err.message || '').trim().replace(/[\s.!]+$/, '');
 }
 
@@ -546,7 +546,7 @@ function transcribePiece(channel, pcm, settings, stt, { context = '', session = 
         return { stale: true, pcm, session, error: res.error || (text ? NEW_SESSION_FIRST : null) };
       }
       if (res.error) {
-        if (res.error.provider === publik.PUBLIK_PROVIDER && isPassingSttError(res.error)) {
+        if (isPassingSttError(res.error)) {
           return { error: res.error, delayMs: sttRetryDelayMs(res.error), pcm, session, context };
         }
         handleSttError(res.error, settings);
@@ -556,6 +556,7 @@ function transcribePiece(channel, pcm, settings, stt, { context = '', session = 
         const turn = { channel, text: res.text.trim(), ts: Date.now() };
         pushTranscript(turn);
         send('transcript', turn);
+        send('stt:final', { channel, text: turn.text });
         lastSttText[channel] = turn.text;
         sttSessionShown = true;
       }
@@ -603,7 +604,7 @@ function startSttSession() {
 function takeHeldAudio() {
   const settings = store.getSettings();
   const stt = createSTT(settings);
-  if (stt.providers[0] !== publik.PUBLIK_PROVIDER || sttDisabled) return null;
+  if (!stt.available || sttDisabled) return null;
   const pieces = {};
   for (const channel of ['you', 'them']) {
     const batcher = publikSttBatchers[channel];
@@ -715,6 +716,7 @@ function handleSttError(err, settings) {
 function startFlushLoop() {
   if (flushTimer) return;
   flushTimer = setInterval(() => { flushChannel('you'); flushChannel('them'); }, FLUSH_MS);
+  if (flushTimer.unref) flushTimer.unref();
 }
 function stopFlushLoop() { if (flushTimer) { clearInterval(flushTimer); flushTimer = null; } }
 
@@ -1086,10 +1088,32 @@ async function runFeature(mode, userText) {
       return;
     }
 
+    console.log(`[llm] mode=${mode} transcriptTurns=${transcript.length} capturing=${state.capturing}`);
+    if (def.transcriptRequired && transcript.length === 0) {
+      send('llm:error', { message: state.capturing
+        ? 'Nothing has been transcribed yet — say something (or let the other side talk) and try again.'
+        : 'Nothing captured yet — press the listen button first so cue can hear the conversation.' });
+      return;
+    }
+
+    const screenPromise = def.needsScreen
+      ? captureScreenshot().catch((error) => ({ __captureError: error }))
+      : Promise.resolve(null);
+
+    const settingsForPrompt = store.getSettings();
+    let contextBlock = buildInterviewContext(settingsForPrompt, mode, transcript);
+    // Summaries of the last few meetings, so "what did we agree last time?"
+    // has something to draw on. Never the current meeting, never leetcode.
+    const memoryBlock = mode !== 'leetcode' && meetingMemory ? meetingMemory.memoryBlock() : null;
+    if (memoryBlock) contextBlock = contextBlock ? contextBlock + '\n\n' + memoryBlock : memoryBlock;
+    const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : (def.system || '');
+
     let imageDataUrl = null;
     if (def.needsScreen) {
       try {
-        imageDataUrl = await captureScreenshot();
+        const screenResult = await screenPromise;
+        if (screenResult && screenResult.__captureError) throw screenResult.__captureError;
+        imageDataUrl = screenResult;
         if (!imageDataUrl) throw new Error('No screen source was available.');
       }
       catch (e) {
@@ -1103,26 +1127,7 @@ async function runFeature(mode, userText) {
       }
     }
 
-    // Follow-up / Recap have nothing to work with before anything was heard —
-    // sent to the model anyway, it fabricates plausible generic output that
-    // looks like a canned preset. Say so instead, and log how much context
-    // every feature actually ran with.
-    console.log(`[llm] mode=${mode} transcriptTurns=${transcript.length} capturing=${state.capturing}`);
-    if (def.transcriptRequired && transcript.length === 0) {
-      send('llm:error', { message: state.capturing
-        ? 'Nothing has been transcribed yet — say something (or let the other side talk) and try again.'
-        : 'Nothing captured yet — press the listen button first so cue can hear the conversation.' });
-      return;
-    }
-
-    const settingsForPrompt = store.getSettings();
-    let contextBlock = buildInterviewContext(settingsForPrompt, mode, transcript);
-    // Summaries of the last few meetings, so "what did we agree last time?"
-    // has something to draw on. Never the current meeting, never leetcode.
-    const memoryBlock = mode !== 'leetcode' && meetingMemory ? meetingMemory.memoryBlock() : null;
-    if (memoryBlock) contextBlock = contextBlock ? contextBlock + '\n\n' + memoryBlock : memoryBlock;
-    const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : (def.system || '');
-    const built = def.build({ transcript, userText: userText || '' });
+    const built = def.build({ transcript, userText: userText || '', hasImage: !!imageDataUrl });
 
     // Watchdog: a provider that stalls mid-stream would otherwise hang the await forever,
     // leaving state.busy = true and wedging every later question until an app restart.
@@ -1579,7 +1584,7 @@ function setCompactMode(compact) {
   store.setSettings({ compactMode });
   if (win && !win.isDestroyed()) {
     const bounds = win.getBounds();
-    const currentPanelW = Math.max(680, store.getSettings().panelWidth || MAIN_W);
+    const currentPanelW = Math.max(820, store.getSettings().panelWidth || MAIN_W);
     const currentH = Math.max(640, store.getSettings().panelHeight || 640);
     const W = SIDE_W + currentPanelW + SIDE_W;
     if (compactMode) {
@@ -1603,7 +1608,7 @@ ipcMain.on('panel:collapse', (_e, collapsed) => {
   const wasCollapsed = isPanelCollapsed;
   isPanelCollapsed = !!collapsed;
   const bounds = win.getBounds();
-  const currentPanelW = Math.max(680, store.getSettings().panelWidth || MAIN_W);
+  const currentPanelW = Math.max(820, store.getSettings().panelWidth || MAIN_W);
   const currentH = Math.max(640, store.getSettings().panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W;
 
@@ -1687,7 +1692,9 @@ ipcMain.on('window:resize', (_e, dims) => {
     newX = bounds.x - SIDE_W;
     isPanelCollapsed = false;
   }
-  win.setBounds({ x: newX, y: bounds.y, width: newTotalW, height: newH });
+  if (bounds.x !== newX || bounds.width !== newTotalW || bounds.height !== newH) {
+    win.setBounds({ x: newX, y: bounds.y, width: newTotalW, height: newH });
+  }
   if (resizeSaveTimer) clearTimeout(resizeSaveTimer);
   resizeSaveTimer = setTimeout(() => {
     store.setSettings({ panelWidth: newPanelW, panelHeight: newH });
@@ -1720,7 +1727,7 @@ function centerWindow() {
   const currentDisplay = screen.getDisplayNearestPoint(cursor) || screen.getPrimaryDisplay();
   const { workArea } = currentDisplay;
   const savedSettings = store.getSettings();
-  const currentPanelW = Math.max(680, savedSettings.panelWidth || MAIN_W);
+  const currentPanelW = Math.max(820, savedSettings.panelWidth || MAIN_W);
   const currentH = Math.max(640, savedSettings.panelHeight || 640);
   const W = SIDE_W + currentPanelW + SIDE_W, H = currentH;
   const startX = Math.round(workArea.x + (workArea.width - currentPanelW) / 2);
@@ -1917,15 +1924,21 @@ function createTray() {
 // Window dragging is done here rather than with CSS drag regions, which misbehave while the
 // renderer toggles click-through. The window follows the cursor until the renderer says stop.
 let windowDrag = null;
+let lastDragX = null, lastDragY = null;
 ipcMain.on('window:drag-start', () => {
   if (!win || win.isDestroyed()) return;
   stopWindowDrag();
   const cursor = screen.getCursorScreenPoint();
   const bounds = win.getBounds();
   const offsetX = cursor.x - bounds.x, offsetY = cursor.y - bounds.y;
+  lastDragX = cursor.x;
+  lastDragY = cursor.y;
   windowDrag = setInterval(() => {
     if (!win || win.isDestroyed()) { stopWindowDrag(); return; }
     const { x, y } = screen.getCursorScreenPoint();
+    if (x === lastDragX && y === lastDragY) return;
+    lastDragX = x;
+    lastDragY = y;
     // setBounds with a fixed size: setPosition can resize the window when crossing mixed-DPI displays on Windows.
     win.setBounds({ x: x - offsetX, y: y - offsetY, width: bounds.width, height: bounds.height });
   }, 16);
@@ -1936,8 +1949,10 @@ ipcMain.on('window:drag-end', () => {
   saveWindowPosition();
 });
 function stopWindowDrag() {
-  clearInterval(windowDrag);
-  windowDrag = null;
+  if (windowDrag) {
+    clearInterval(windowDrag);
+    windowDrag = null;
+  }
 }
 ipcMain.on('open-pane', (_e, url) => { shell.openExternal(url).catch(() => {}); });
 ipcMain.on('app:quit', () => app.quit());
@@ -1965,7 +1980,6 @@ ipcMain.handle('profile:pickDocument', async () => {
     return { canceled: false, error: (e && e.message) || String(e) };
   }
 });
-ipcMain.on('app:quit', () => app.quit());
 ipcMain.handle('applink:state', () => appLinkConsentState());
 ipcMain.handle('applink:revoke', (_e, callerId) => {
   // Forgetting a caller also clears its separate slide-caption consent decision,
@@ -2092,7 +2106,7 @@ function createPermissionsWindow() {
     transparent: true,
     hasShadow: true,
     resizable: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
     fullscreenable: false,
     title: 'Angel X',
     webPreferences: {
@@ -2102,6 +2116,7 @@ function createPermissionsWindow() {
       sandbox: false,
     }
   });
+  permWin.setSkipTaskbar(true);
   permWin.loadFile(path.join(__dirname, 'renderer', 'permissions.html'));
   permWin.webContents.on('did-finish-load', () => permWin.show());
 }

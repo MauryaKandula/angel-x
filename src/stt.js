@@ -24,7 +24,7 @@ function looksLikeHallucination(raw) {
 
 function buildVocabPrompt(settings) {
   const s = settings || {};
-  const text = (s.resumeText || '') + ' ' + (s.jobDescription || '');
+  const text = (s.sessionContext || '') + ' ' + (s.resumeText || '') + ' ' + (s.jobDescription || '');
   const proper = Array.from(new Set(text.match(/\b([A-Z][a-zA-Z0-9+.#]{2,}|[A-Z]{2,6})\b/g) || []));
   let prompt = BASE_VOCAB + (proper.length ? ', ' + proper.slice(0, 60).join(', ') : '');
   if (prompt.length > 850) prompt = prompt.slice(0, 850);
@@ -101,7 +101,7 @@ async function transcribeGeminiWith(ai, wav, now = Date.now()) {
     return extractGeminiTranscript(res);
   } catch (e) {
     if (!isNotFoundError(e)) throw e;
-    const fallbacks = ['2.5-flash', '2.0-flash'].map((v) => 'gemini-' + v);
+    const fallbacks = ['3.8-flash', '3.5-flash', '2.5-flash'].map((v) => 'gemini-' + v);
     let lastErr = e;
     for (const fb of fallbacks) {
       try {
@@ -219,23 +219,31 @@ function createSTT(settings) {
   const chain = [];
   // 'auto' for the own-key providers below; off while publik owns Auto.
   const ownAuto = selectedProvider === 'auto' && !publikOwnsAutoAudio(settings);
+  const isGroq = selectedProvider === 'groq';
+
+  // Groq Whisper (free, high-speed whisper-large-v3-turbo) — preferred default for own-key / auto
+  if ((ownAuto || isGroq) && keys.groq) {
+    const model = 'whisper-large-v3-turbo';
+    chain.push({ p: 'groq', m: model, fn: async (wav, opts) => {
+      const context = opts && opts.context;
+      const text = await transcribeOpenAI(keys.groq, wav, model, 'https://api.groq.com/openai/v1', promptWithContext(vocabPrompt, context));
+      return context ? continuedText(text, context) : text;
+    } });
+  }
+  // Gemini as cloud failover / direct selection
+  if ((ownAuto || isGroq || selectedProvider === 'gemini') && keys.gemini) {
+    const model = resolveGeminiModel(settings);
+    chain.push({ p: 'gemini', m: model, fn: (wav) => transcribeGemini(keys.gemini, wav) });
+  }
   // Each entry carries the model id it actually sends, so a failure can name
   // that id back to the user instead of a hardcoded one they never picked.
   if ((ownAuto || selectedProvider === 'openai') && keys.openai) {
     const model = settings.sttModel || 'whisper-1';
-    chain.push({ p: 'openai', m: model, fn: (wav) => transcribeOpenAI(keys.openai, wav, model, undefined, vocabPrompt) });
-  }
-  if ((ownAuto || selectedProvider === 'groq') && keys.groq) {
-    const model = 'whisper-large-v3-turbo';
-    chain.push({ p: 'groq', m: model, fn: (wav) => transcribeOpenAI(keys.groq, wav, model, 'https://api.groq.com/openai/v1', vocabPrompt) });
-  }
-  if ((ownAuto || selectedProvider === 'gemini') && keys.gemini) {
-    // transcribeGemini always tries the dedicated GEMINI_TRANSCRIBE_MODEL first
-    // (falling back to CURRENT_GEMINI_DEFAULT only on a 404/429 cooldown); `m`
-    // here is just what error messages/`stt.models` report, resolved the same
-    // way the chat path picks a model.
-    const model = resolveGeminiModel(settings);
-    chain.push({ p: 'gemini', m: model, fn: (wav) => transcribeGemini(keys.gemini, wav) });
+    chain.push({ p: 'openai', m: model, fn: async (wav, opts) => {
+      const context = opts && opts.context;
+      const text = await transcribeOpenAI(keys.openai, wav, model, undefined, promptWithContext(vocabPrompt, context));
+      return context ? continuedText(text, context) : text;
+    } });
   }
   // Custom (OpenAI-compatible) endpoint: same shape as the Groq branch above,
   // just pointed at the user's own Base URL. Deliberately NOT part of 'auto' —
@@ -243,9 +251,13 @@ function createSTT(settings) {
   // the audio-transcription API at all, so this only fires on an explicit
   // choice, and only once both the URL and the key it needs are actually set.
   if (selectedProvider === 'custom' && keys.custom && settings.baseUrl) {
-    chain.push({ p: 'custom', fn: (wav) => transcribeOpenAI(keys.custom, wav, settings.sttModel, settings.baseUrl, vocabPrompt) });
+    chain.push({ p: 'custom', fn: async (wav, opts) => {
+      const context = opts && opts.context;
+      const text = await transcribeOpenAI(keys.custom, wav, settings.sttModel, settings.baseUrl, promptWithContext(vocabPrompt, context));
+      return context ? continuedText(text, context) : text;
+    } });
   }
-  if (keys.openai && chain.length > 1) chain.unshift(chain.splice(chain.findIndex((c) => c.p === 'openai'), 1)[0]);
+  if (!keys.groq && keys.openai && chain.length > 1) chain.unshift(chain.splice(chain.findIndex((c) => c.p === 'openai'), 1)[0]);
   // publik API: the transcription path for a person who runs cue on publik
   // (smoke test 2026-11-02: such a Mac user got "No transcription key set"
   // and no transcript). In 'auto' it is the only entry (publikOwnsAutoAudio);
@@ -260,6 +272,7 @@ function createSTT(settings) {
     } });
   }
 
+  const providerCooldowns = {};
   let disabledUntil = 0;
   let lastProvider = null;
 
@@ -275,9 +288,13 @@ function createSTT(settings) {
       if (disabledUntil && now < disabledUntil) return { text: '', error: { provider: lastProvider, message: `Temporary ${lastProvider || 'provider'} quota or rate-limit; waiting 30s before retrying.` } };
       const wav = pcmToWav(pcm, 16000, 1);
       let lastErr = null;
+      let anyAttempted = false;
       for (const c of chain) {
+        if (providerCooldowns[c.p] && now < providerCooldowns[c.p]) continue;
+        anyAttempted = true;
         try {
           const text = await c.fn(wav, opts);
+          delete providerCooldowns[c.p];
           disabledUntil = 0;
           lastProvider = c.p;
           if (looksLikeHallucination(text)) return { text: '', provider: c.p };
@@ -300,11 +317,21 @@ function createSTT(settings) {
           if (retryAfterMs) lastErr.retryAfterMs = retryAfterMs;
           if (formatted instanceof Error && formatted.action) lastErr.action = formatted.action;
           if (backOff) {
+            const cooldown = (retryAfterMs && retryAfterMs > 0) ? retryAfterMs : 30000;
+            providerCooldowns[c.p] = now + cooldown;
             lastProvider = c.p;
-            disabledUntil = now + 30000;
-            break;
+            // When multiple providers exist in the chain (e.g. Groq with Gemini failover),
+            // continue down the chain to try the remaining provider instead of aborting.
+            continue;
           }
         }
+      }
+      if (!anyAttempted) {
+        return { text: '', error: { provider: lastProvider, message: `Temporary ${lastProvider || 'provider'} quota or rate-limit; waiting before retrying.` } };
+      }
+      if (lastErr) {
+        lastProvider = lastErr.provider;
+        disabledUntil = now + (lastErr.retryAfterMs || 30000);
       }
       return { text: '', error: lastErr };
     }

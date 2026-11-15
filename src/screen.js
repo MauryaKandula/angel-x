@@ -57,25 +57,42 @@ function captureMacNative() {
   });
 }
 
+// Live captures encode at 1280px long-edge / quality 76 for fast Smart Screen
+// scans while encodeScreenshot keeps MAX_LONG_EDGE_PX (1568) and JPEG_QUALITY (70)
+// as its default constants.
+const CAPTURE_MAX_LONG_EDGE_PX = 1280;
+const CAPTURE_JPEG_QUALITY = 76;
+
 async function captureScreenshot() {
   if (process.platform === 'darwin') {
     const macImg = await captureMacNative();
-    if (macImg) return encodeScreenshot(macImg);
+    if (macImg) return encodeScreenshot(macImg, { maxLongEdge: CAPTURE_MAX_LONG_EDGE_PX, quality: CAPTURE_JPEG_QUALITY });
   }
 
   const primary = screen.getPrimaryDisplay();
   const { width, height } = primary.size;
   const scale = primary.scaleFactor || 1;
+  const fullW = Math.floor(width * scale);
+  const fullH = Math.floor(height * scale);
+  const longEdge = Math.max(fullW, fullH);
+  let thumbW = fullW;
+  let thumbH = fullH;
+  if (longEdge > CAPTURE_MAX_LONG_EDGE_PX) {
+    const ratio = CAPTURE_MAX_LONG_EDGE_PX / longEdge;
+    thumbW = Math.round(fullW * ratio);
+    thumbH = Math.round(fullH * ratio);
+  }
   const sources = await desktopCapturer.getSources({
     types: ['screen'],
-    thumbnailSize: { width: Math.floor(width * scale), height: Math.floor(height * scale) }
+    thumbnailSize: { width: thumbW, height: thumbH },
+    fetchWindowIcons: false
   });
   if (!sources.length) return null;
   // Prefer the primary display source.
   const src = sources.find((s) => String(s.display_id) === String(primary.id)) || sources[0];
   const img = src.thumbnail;
   if (!img || img.isEmpty()) return null;
-  return encodeScreenshot(img); // data:image/jpeg;base64,...
+  return encodeScreenshot(img, { maxLongEdge: CAPTURE_MAX_LONG_EDGE_PX, quality: CAPTURE_JPEG_QUALITY }); // data:image/jpeg;base64,...
 }
 
-module.exports = { captureScreenshot, encodeScreenshot, captureMacNative, MAX_LONG_EDGE_PX, JPEG_QUALITY, MAX_DATA_URL_BYTES };
+module.exports = { captureScreenshot, encodeScreenshot, captureMacNative, MAX_LONG_EDGE_PX, JPEG_QUALITY, CAPTURE_MAX_LONG_EDGE_PX, CAPTURE_JPEG_QUALITY, MAX_DATA_URL_BYTES };

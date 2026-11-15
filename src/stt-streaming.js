@@ -670,7 +670,7 @@ function createStreamingSTT(settings, channel, callbacks) {
   // here too and is served by createSTT()'s batch chain — same as local/gemini.
   return {
     type: 'batch',
-    provider: selectedProvider === 'custom' ? 'custom' : (selectedProvider === 'auto' && keys.gemini ? 'gemini' : 'none'),
+    provider: selectedProvider === 'custom' ? 'custom' : (selectedProvider === 'groq' || (selectedProvider === 'auto' && keys.groq) ? 'groq' : (selectedProvider === 'auto' && keys.gemini ? 'gemini' : (selectedProvider === 'gemini' ? 'gemini' : 'none'))),
     instance: null
   };
 }
