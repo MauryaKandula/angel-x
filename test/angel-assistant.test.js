@@ -1108,3 +1108,41 @@ test('STT hallucination filter drops Whisper tags and shared multi-provider cool
     if (origStt) require.cache[sttPath] = origStt; else delete require.cache[sttPath];
   }
 });
+
+test('Window stealth hardens permWin, avoids focus stealing, persists clickThrough, syncs preload channels, and honors hideTray/disableGlobalShortcuts', () => {
+  const mainSrc = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+  const preloadSrc = fs.readFileSync(path.join(__dirname, '../preload.js'), 'utf8');
+  const storeSrc = fs.readFileSync(path.join(__dirname, '../src/store.js'), 'utf8');
+
+  const createWinBlock = mainSrc.slice(mainSrc.indexOf('function createWindow()'), mainSrc.indexOf('// -------- STT flushing'));
+  const createPermBlock = mainSrc.slice(mainSrc.indexOf('function createPermissionsWindow()'), mainSrc.indexOf('// -------- launch'));
+  const visBlock = mainSrc.slice(mainSrc.indexOf('function toggleWindowVisibility()'), mainSrc.indexOf('// -------- Shortcuts reload'));
+
+  // 1. Permissions window disables drop shadow, enables content protection, and shows inactive
+  assert.ok(/hasShadow:\s*false/.test(createPermBlock), 'permWin disables OS drop shadow');
+  assert.ok(createPermBlock.includes('permWin.setContentProtection(true)'), 'permWin enables content protection');
+  assert.ok(createPermBlock.includes('permWin.showInactive()'), 'permWin uses showInactive()');
+
+  // 2. Content protection checks WIN_IS_LOCAL_CONSOLE_SESSION & CUE_NO_PROTECT and notifies renderer
+  assert.ok(createWinBlock.includes('!process.env.CUE_NO_PROTECT && WIN_IS_LOCAL_CONSOLE_SESSION'), 'shouldProtect gates on console session');
+  assert.ok(mainSrc.includes('function canApplyContentProtection()') && mainSrc.includes('!process.env.CUE_NO_PROTECT && WIN_IS_LOCAL_CONSOLE_SESSION'), 'shared content protection guard checks CUE_NO_PROTECT and console session');
+  assert.ok(mainSrc.includes("send('screen-protection:changed', { enabled:"), 'emits screen-protection:changed');
+
+  // 3. No focus stealing on launch, toggle visibility, or centerWindow
+  assert.ok(createWinBlock.includes('win.showInactive()') && !createWinBlock.includes('win.focus()'), 'createWindow uses showInactive without focus()');
+  assert.ok(visBlock.includes('win.showInactive()') && !visBlock.includes('win.focus()'), 'toggleWindowVisibility and centerWindow use showInactive without focus()');
+
+  // 4. Click-through persists to store and restores at startup
+  assert.ok(createWinBlock.includes('if (savedSettings.clickThrough)') && createWinBlock.includes('win.setIgnoreMouseEvents(true, { forward: true })'), 'restores clickThrough on launch');
+  assert.ok(mainSrc.slice(mainSrc.indexOf('function setClickThrough'), mainSrc.indexOf('function toggleClickThrough')).includes('store.setSettings({ clickThrough: clickThroughMode })'), 'persists clickThrough setting');
+
+  // 5. Preload whitelist includes resized, panel expand, and screen protection sync channels
+  for (const ch of ['window:resized', 'panel:expand', 'screen-protection:changed']) {
+    assert.ok(preloadSrc.includes(`'${ch}'`), `preload allows ${ch}`);
+  }
+
+  // 6. Optional zero-tray and hotkey suppression flags in store.js and main.js
+  assert.ok(/hideTray:\s*false/.test(storeSrc) && /disableGlobalShortcuts:\s*false/.test(storeSrc), 'store defaults hideTray and disableGlobalShortcuts');
+  assert.ok(mainSrc.includes('if (tray || store.getSettings().hideTray) return;'), 'createTray respects hideTray');
+  assert.ok(mainSrc.includes('if (savedSettings.disableGlobalShortcuts)'), 'registerShortcuts respects disableGlobalShortcuts');
+});

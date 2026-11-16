@@ -107,6 +107,22 @@ const WIN_SUPPORTS_CONTENT_PROTECTION = !isWindows || WIN_BUILD >= 19041;
 // everyone, including the user trying to grant it microphone access.
 const WIN_IS_LOCAL_CONSOLE_SESSION = !isWindows || process.env.SESSIONNAME === 'Console';
 
+function canApplyContentProtection() {
+  return !process.env.CUE_NO_PROTECT && WIN_IS_LOCAL_CONSOLE_SESSION && !isLinux && WIN_SUPPORTS_CONTENT_PROTECTION;
+}
+
+function applyContentProtection(targetWin, enabled) {
+  if (targetWin && !targetWin.isDestroyed() && canApplyContentProtection()) {
+    try {
+      targetWin.setContentProtection(!!enabled);
+      return true;
+    } catch (err) {
+      console.error('[Angel X] Failed to update screen protection:', err);
+    }
+  }
+  return false;
+}
+
 let permWin = null;
 // Windows never blocks startup on an unresolved permission (see app.whenReady()
 // below), so launchApp() can already have run once by the time the user grants
@@ -339,7 +355,12 @@ function createWindow() {
   win = new BrowserWindow(winOptions);
   win.setSkipTaskbar(true);
 
-  const shouldProtect = !process.env.CUE_NO_PROTECT && (savedSettings.screenProtection !== false);
+  if (savedSettings.clickThrough) {
+    clickThroughMode = true;
+    win.setIgnoreMouseEvents(true, { forward: true });
+  }
+
+  const shouldProtect = !process.env.CUE_NO_PROTECT && WIN_IS_LOCAL_CONSOLE_SESSION && (savedSettings.screenProtection !== false);
   if (shouldProtect) {
     if (isLinux) {
       console.log('[cue] Running on Linux: native screen protection (setContentProtection) is not supported and has been skipped.');
@@ -363,10 +384,12 @@ function createWindow() {
   win.setTitle('Angel X'); // set before load
 
   win.webContents.on('did-finish-load', () => {
-    win.show();
-    win.focus();
+    win.showInactive();
     win.moveTop();
     win.setTitle('Angel X');
+    if (clickThroughMode) {
+      send('click-through:changed', { enabled: true });
+    }
     if (savedSettings.compactMode) {
       compactMode = true;
       send('compact:changed', { compact: true });
@@ -1214,20 +1237,27 @@ ipcMain.handle('settings:set', (_e, patch) => {
   }
   // Restart slide polling with the new interval when capturing (keeps slides).
   if (state.capturing) startSlideLoop();
-  if (patch && patch.shortcuts) {
+  if (patch && ('disableGlobalShortcuts' in patch || 'shortcuts' in patch)) {
     registerShortcuts();
+  }
+  if (patch && 'hideTray' in patch) {
+    if (next.hideTray) {
+      if (tray && !tray.isDestroyed()) {
+        try { tray.destroy(); } catch (_) {}
+        tray = null;
+      }
+    } else if (!tray) {
+      createTray();
+    }
   }
   if (patch && 'alwaysOnTop' in patch && win && !win.isDestroyed()) {
     win.setAlwaysOnTop(patch.alwaysOnTop !== false, 'screen-saver', 1);
   }
-  if (patch && 'screenProtection' in patch && win && !win.isDestroyed()) {
-    if (WIN_SUPPORTS_CONTENT_PROTECTION && !process.env.CUE_NO_PROTECT) {
-      try {
-        win.setContentProtection(patch.screenProtection !== false);
-      } catch (err) {
-        console.error('[Angel X] Failed to update screen protection:', err);
-      }
-    }
+  if (patch && 'screenProtection' in patch) {
+    const enabled = patch.screenProtection !== false;
+    applyContentProtection(win, enabled);
+    applyContentProtection(permWin, enabled);
+    send('screen-protection:changed', { enabled });
   }
   updateTray();
   return store.redactForRenderer(next);
@@ -1558,6 +1588,7 @@ ipcMain.on('mouse:ignore', (_e, v) => {
 // -------- Click-through mode --------
 function setClickThrough(enabled) {
   clickThroughMode = !!enabled;
+  store.setSettings({ clickThrough: clickThroughMode });
   if (win && !win.isDestroyed()) {
     win.setIgnoreMouseEvents(clickThroughMode, { forward: true });
   }
@@ -1669,9 +1700,9 @@ ipcMain.handle('screen-protection:toggle', () => {
   const settings = store.getSettings();
   const next = settings.screenProtection === false ? true : false;
   store.setSettings({ screenProtection: next });
-  if (win && !win.isDestroyed() && WIN_SUPPORTS_CONTENT_PROTECTION) {
-    win.setContentProtection(next);
-  }
+  applyContentProtection(win, next);
+  applyContentProtection(permWin, next);
+  send('screen-protection:changed', { enabled: next });
   updateTray();
   return next;
 });
@@ -1713,8 +1744,7 @@ function toggleWindowVisibility() {
   if (win.isVisible()) {
     win.hide();
   } else {
-    win.show();
-    win.focus();
+    win.showInactive();
     win.moveTop();
   }
   send('hide:toggle', { visible: win.isVisible() });
@@ -1737,8 +1767,7 @@ function centerWindow() {
   } else {
     win.setBounds({ x: startX - SIDE_W, y: startY, width: W, height: H });
   }
-  win.show();
-  win.focus();
+  win.showInactive();
   win.moveTop();
   saveWindowPosition();
 }
@@ -1810,9 +1839,9 @@ function updateTray() {
       checked: win && !win.isDestroyed() && (store.getSettings().screenProtection !== false),
       click: (item) => {
         store.setSettings({ screenProtection: item.checked });
-        if (win && !win.isDestroyed() && WIN_SUPPORTS_CONTENT_PROTECTION) {
-          win.setContentProtection(item.checked);
-        }
+        applyContentProtection(win, item.checked);
+        applyContentProtection(permWin, item.checked);
+        send('screen-protection:changed', { enabled: item.checked });
         updateTray();
       }
     },
@@ -1909,7 +1938,7 @@ function updateTray() {
 }
 
 function createTray() {
-  if (tray) return;
+  if (tray || store.getSettings().hideTray) return;
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
@@ -2003,7 +2032,12 @@ ipcMain.on('permissions:continue', async () => {
 // -------- shortcuts --------
 function registerShortcuts() {
   globalShortcut.unregisterAll();
-  const currentShortcuts = resolveShortcuts(store.getSettings().shortcuts || {});
+  const savedSettings = store.getSettings();
+  if (savedSettings.disableGlobalShortcuts) {
+    for (const key of Object.keys(shortcutState)) shortcutState[key] = false;
+    return;
+  }
+  const currentShortcuts = resolveShortcuts(savedSettings.shortcuts || {});
 
   shortcutState.say = currentShortcuts.say ? globalShortcut.register(currentShortcuts.say, () => runFeature('say', '')) : false;
   shortcutState.assist = currentShortcuts.assist ? globalShortcut.register(currentShortcuts.assist, () => runFeature('assist', '')) : false;
@@ -2104,7 +2138,7 @@ function createPermissionsWindow() {
     y: Math.round(workArea.y + (workArea.height - H) / 2),
     frame: false,
     transparent: true,
-    hasShadow: true,
+    hasShadow: false,
     resizable: false,
     skipTaskbar: true,
     fullscreenable: false,
@@ -2117,8 +2151,11 @@ function createPermissionsWindow() {
     }
   });
   permWin.setSkipTaskbar(true);
+  if (store.getSettings().screenProtection !== false && canApplyContentProtection()) {
+    try { permWin.setContentProtection(true); } catch (_) {}
+  }
   permWin.loadFile(path.join(__dirname, 'renderer', 'permissions.html'));
-  permWin.webContents.on('did-finish-load', () => permWin.show());
+  permWin.webContents.on('did-finish-load', () => permWin.showInactive());
 }
 
 // -------- launch (called after permissions are confirmed) --------

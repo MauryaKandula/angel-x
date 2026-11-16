@@ -56,7 +56,7 @@ const bridge = {
   permissionsContinue: () => ipcRenderer.send('permissions:continue'),
   log: (msg) => ipcRenderer.send('log', msg),
   on: (channel, cb) => {
-    const allowed = ['capture:state', 'llm:start', 'llm:thinking', 'llm:token', 'llm:done', 'llm:error', 'status', 'transcript', 'transcript:restore', 'stt:interim', 'stt:final', 'stt:status', 'vad:state', 'applink:consent-request', 'hide:toggle', 'whisper:download-progress', 'whisper:models-changed', 'publik:state', 'slides:update', 'click-through:changed', 'compact:changed', 'always-on-top:changed', 'opacity:set', 'shortcuts:updated', 'settings:open', 'settings:open-gpt'];
+    const allowed = ['capture:state', 'llm:start', 'llm:thinking', 'llm:token', 'llm:done', 'llm:error', 'status', 'transcript', 'transcript:restore', 'stt:interim', 'stt:final', 'stt:status', 'vad:state', 'applink:consent-request', 'hide:toggle', 'whisper:download-progress', 'whisper:models-changed', 'publik:state', 'slides:update', 'click-through:changed', 'screen-protection:changed', 'compact:changed', 'always-on-top:changed', 'opacity:set', 'window:resized', 'panel:expand', 'shortcuts:updated', 'settings:open', 'settings:open-gpt'];
     if (!allowed.includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => cb(data));
   }

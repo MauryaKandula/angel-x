@@ -86,6 +86,8 @@ const DEFAULTS = {
   startCollapsed: true,
   screenProtection: true,
   clickThrough: false,
+  hideTray: false,
+  disableGlobalShortcuts: false,
   autoAnswer: false,
   panelWidth: 700,
   panelHeight: 640,
